@@ -1,303 +1,482 @@
-# %%
+#%%
+import math
+import heapq
 import networkx as nx
 import matplotlib.pyplot as plt
-import heapq
 
 ###############################################################################
-# 1) Define the 6-node scenario with FOUR modes (Drive, Fly, Swim, Roll).
+# 1) BUILD THE WORLD GRAPH
 ###############################################################################
 
-NODES = [1, 2, 3, 4, 5, 6]
-
-# Driving edges (dict of (u, v) -> cost).
-drive_edges = {
-    (1, 2): 2,
-    (2, 3): 4,
-    (3, 4): 3,
-    (4, 5): 2,
-    (5, 3): 2,
-    (1, 3): 5,
-    # no (4,6) or (5,6) => cliff => not driveable
-}
-
-# Flying edges (dict of (u, v) -> cost).
-fly_edges = {
-    (4, 6): 7,  # cliff
-    (5, 6): 6,  # cliff
-    (1, 2): 8,
-    (2, 5): 9,
-    (3, 4): 7,
-    (3, 6): 6,
-}
-
-# Swimming edges (dict of (u, v) -> cost).
-swim_edges = {
-    (2, 6): 3,
-    (5, 6): 2,
-    # etc.
-}
-
-# Rolling edges (dict of (u, v) -> cost).
-# For example, let's say the robot can "roll" from 2->4, 4->6, etc.
-roll_edges = {
-    (2, 4): 0,   # maybe some rolling path
-    (4, 6): 0,   # can roll up the cliff with a rope?
-    (1, 5): 0,   # just an example
-    # ...
-}
-
-# Cost for switching modes at any node (drive <-> fly <-> swim <-> roll).
-SWITCH_COST = 1
-
-
-###############################################################################
-# 2) Build the Layered Graph with 4 modes (D, F, S, R) and run Dijkstra
-###############################################################################
-
-def build_layered_graph(drive, fly, swim, roll, switch_cost):
+def build_world_graph():
     """
-    Creates a layered DiGraph with nodes (v, mode) where mode in {D, F, S, R}.
-      - For each (u->v) in drive, add ((u,'D') -> (v,'D')) with drive cost
-      - For fly, add ((u,'F') -> (v,'F'))
-      - For swim, add ((u,'S') -> (v,'S'))
-      - For roll, add ((u,'R') -> (v,'R'))
-      - For each node v, add mode-switch edges among all 4 modes with cost=switch_cost.
+    Creates an undirected 'world' graph with 8 nodes, each node has 'height' in {0,10,100}.
+    Edges have 'distance' + 'terrain' in {water, slope, cliff, grass}.
     """
-    G = nx.DiGraph()
-    
-    modes = ['D', 'F', 'S', 'R']
-    # 1) Add layered nodes
-    for v in NODES:
-        for m in modes:
-            G.add_node((v, m))
+    # Node heights
+    node_heights = {
+        1: 0,
+        2: 0,
+        3: 100,
+        4: 100,
+        5: 0,
+        6: 0,
+        7: 100,
+        8: 100,
+    }
 
-    # 2) Add edges for each mode
-    for (u, w), cost_d in drive.items():
-        G.add_edge((u, 'D'), (w, 'D'), weight=cost_d)
-    for (u, w), cost_f in fly.items():
-        G.add_edge((u, 'F'), (w, 'F'), weight=cost_f)
-    for (u, w), cost_s in swim.items():
-        G.add_edge((u, 'S'), (w, 'S'), weight=cost_s)
-    for (u, w), cost_r in roll.items():
-        G.add_edge((u, 'R'), (w, 'R'), weight=cost_r)
+    # (u, v, distance, terrain)
+    edges = [
+        (1, 2, 200, "grass"),
+        (3, 4, 400, "grass"),
+        (4, 7, 500, "grass"),
+        (7, 8, 200, "grass"),
 
-    # 3) Add mode-switch edges among {D, F, S, R} at each node
-    for v in NODES:
-        for m1 in modes:
-            for m2 in modes:
-                if m1 != m2:
-                    G.add_edge((v, m1), (v, m2), weight=switch_cost)
+        (2, 5, 300, "water"),
+        (5, 6, 100, "water"),
+
+        (2, 3, 400, "slope"),
+        (6, 7, 300, "slope"),
+
+        (4, 6, 20,  "cliff"),
+    ]
+
+    G = nx.Graph()
+    for node, h in node_heights.items():
+        G.add_node(node, height=h)
+    for (u, v, dist, terr) in edges:
+        G.add_edge(u, v, distance=dist, terrain=terr)
 
     return G
 
-def layered_dijkstra(G_layered, start_node, start_mode, goal_node, goal_mode):
+
+###############################################################################
+# 2) BUILD LAYERED GRAPH (WITH BATTERY)
+###############################################################################
+
+MODES = {
+    'fly':   {'speed': 5.0,  'power': 1000.0},  # m/s, W
+    'swim':  {'speed': 0.5,  'power':   10.0},
+    'roll':  {'speed': 3.0,  'power':    1.0},
+    'drive': {'speed': 1.0,  'power':   50.0},
+}
+
+SWITCH_TIME   = 100.0   # s time penalty for mode switch
+SWITCH_ENERGY = 1.0     # Wh penalty for switching
+BATTERY_CAPACITY=30.0   # Wh
+RECHARGE_TIME=5000.0    # s
+
+def is_edge_allowed(mode, terrain, h1, h2):
     """
-    Run Dijkstra on the layered graph from (start_node, start_mode) 
-    to (goal_node, goal_mode). Returns (distance, layered_path).
+    * fly => any terrain
+    * swim => only 'water'
+    * roll => slope => from h>h2 (downhill, e.g. 100->0)
+    * drive => 'grass','slope'
+    * cliff => only fly
     """
-    source = (start_node, start_mode)
-    target = (goal_node, goal_mode)
-    
-    dist = {n: float('inf') for n in G_layered.nodes()}
-    dist[source] = 0
-    pred = {n: None for n in G_layered.nodes()}
-    pq = [(0, source)]
-    
+    if mode=='fly':
+        return True
+    if mode=='swim':
+        return (terrain=='water')
+    if mode=='roll':
+        if terrain=='slope' and (h1>h2):
+            return True
+        return False
+    if mode=='drive':
+        if terrain in ('grass','slope'):
+            return True
+        return False
+    return False
+
+def build_layered_graph(G_world):
+    """
+    Create a layered DiGraph L with nodes=(node, mode). 
+    For each feasible edge => 'time'=distance/speed, 'energy_Wh'=(power*time)/3600
+    Also add mode-switch edges => time=SWITCH_TIME, energy=SWITCH_ENERGY/3600 if you want.
+    """
+    L = nx.DiGraph()
+    modes_list = list(MODES.keys())
+
+    # Layered nodes
+    for v in G_world.nodes():
+        for m in modes_list:
+            L.add_node((v,m))
+
+    # Add "travel" edges if allowed
+    for (u, v) in G_world.edges():
+        dist=G_world[u][v]['distance']
+        terr=G_world[u][v]['terrain']
+        hu=G_world.nodes[u]['height']
+        hv=G_world.nodes[v]['height']
+
+        for mode in modes_list:
+            speed=MODES[mode]['speed']
+            power=MODES[mode]['power']
+            # forward
+            if is_edge_allowed(mode, terr, hu, hv):
+                t=dist/speed
+                eW=(power*t)/3600.0
+                L.add_edge(
+                    (u,mode),
+                    (v,mode),
+                    time=t,
+                    energy_Wh=eW
+                )
+            # backward
+            if is_edge_allowed(mode, terr, hv, hu):
+                t=dist/speed
+                eW=(power*t)/3600.0
+                L.add_edge(
+                    (v,mode),
+                    (u,mode),
+                    time=t,
+                    energy_Wh=eW
+                )
+
+    # Add mode-switch edges
+    for node in G_world.nodes():
+        for m1 in modes_list:
+            for m2 in modes_list:
+                if m1!=m2:
+                    L.add_edge(
+                        (node,m1),
+                        (node,m2),
+                        time=SWITCH_TIME,
+                        energy_Wh=(SWITCH_ENERGY/3600.0)
+                    )
+
+    return L
+
+
+###############################################################################
+# 3) LAYERED DIJKSTRA WITH BATTERY
+###############################################################################
+
+def layered_dijkstra_with_battery(L, start_node, start_mode, goal_node, goal_mode,
+                                  battery_capacity=BATTERY_CAPACITY,
+                                  recharge_time=RECHARGE_TIME):
+    """
+    A Dijkstra that tracks battery usage in Wh:
+      - State = (node, mode, used_energy).
+      - If used_energy+edge_energy>battery_capacity => recharge_time => used_energy=edge_energy
+    Returns (best_time, path_list, recharge_nodes).
+    path_list is a list of (node,mode) ignoring used_energy,
+    recharge_nodes is a set of nodes where a recharge occurred.
+    """
+    dist={}
+    pred={}
+    recharged={}
+
+    source=(start_node, start_mode, 0.0)
+    dist[source]=0.0
+    pred[source]=None
+    recharged[source]=False
+
+    pq=[(0.0, source)]
     while pq:
-        cur_dist, cur_node = heapq.heappop(pq)
-        if cur_node == target:
-            # Reconstruct path
-            path = []
-            while cur_node is not None:
-                path.append(cur_node)
-                cur_node = pred[cur_node]
-            path.reverse()
-            return cur_dist, path
-        
-        if cur_dist > dist[cur_node]:
+        cur_time, (cur_node,cur_mode,cur_used)=heapq.heappop(pq)
+        if cur_time>dist[(cur_node,cur_mode,cur_used)]:
             continue
-        
-        for nbr in G_layered.successors(cur_node):
-            edge_cost = G_layered[cur_node][nbr]['weight']
-            new_dist = cur_dist + edge_cost
-            if new_dist < dist[nbr]:
-                dist[nbr] = new_dist
-                pred[nbr] = cur_node
-                heapq.heappush(pq, (new_dist, nbr))
-    
-    return float('inf'), []
+        if (cur_node==goal_node) and (cur_mode==goal_mode):
+            # reconstruct
+            final_time=cur_time
+            path=[]
+            recharge_set=set()
+            c=(cur_node,cur_mode,cur_used)
+            while c is not None:
+                path.append((c[0],c[1]))
+                if recharged.get(c,False):
+                    recharge_set.add(c[0])
+                c=pred.get(c,None)
+            path.reverse()
+            return (final_time, path, recharge_set)
 
-# Build & run layered Dijkstra (example: start driving at node 1, end driving at node 6)
-G_layered = build_layered_graph(drive_edges, fly_edges, swim_edges, roll_edges, SWITCH_COST)
-dist_val, layered_path = layered_dijkstra(G_layered, 1, 'D', 6, 'D')
+        # explore
+        for nbr in L.successors((cur_node,cur_mode)):
+            edge_time=L[(cur_node,cur_mode)][nbr]['time']
+            edge_energy=L[(cur_node,cur_mode)][nbr].get('energy_Wh',0.0)
+            (nbr_node,nbr_mode)=nbr
 
-print("=== LAYERED DIJKSTRA (4 MODES) ===")
-print("Distance =", dist_val)
-print("Layered path =", layered_path)
-print("Node-only path =", [p[0] for p in layered_path])
+            if (nbr_mode==cur_mode) and (nbr_node!=cur_node):
+                if cur_used+edge_energy<=battery_capacity:
+                    new_used=cur_used+edge_energy
+                    new_time=cur_time+edge_time
+                    did_recharge=False
+                else:
+                    new_time=cur_time+recharge_time+edge_time
+                    new_used=edge_energy
+                    did_recharge=True
+                next_state=(nbr_node,nbr_mode,new_used)
+            else:
+                new_time=cur_time+edge_time
+                next_state=(nbr_node,nbr_mode,cur_used)
+                did_recharge=False
 
+            old_val=dist.get(next_state,math.inf)
+            if new_time<old_val:
+                dist[next_state]=new_time
+                pred[next_state]=(cur_node,cur_mode,cur_used)
+                recharged[next_state]=did_recharge
+                heapq.heappush(pq,(new_time,next_state))
 
-###############################################################################
-# 3) Build a Visualization Graph (6-node map) with D,F,S,R costs
-###############################################################################
-
-def build_visual_graph(drive, fly, swim, roll):
-    """
-    Creates a DiGraph with edges labeled for up to four modes:
-      G[u][v]['driveCost'] = cost or None
-      G[u][v]['flyCost']   = cost or None
-      G[u][v]['swimCost']  = cost or None
-      G[u][v]['rollCost']  = cost or None
-    """
-    Gv = nx.DiGraph()
-
-    for v in NODES:
-        Gv.add_node(v)
-
-    def add_or_update_edge(u, v, dcost=None, fcost=None, scost=None, rcost=None):
-        if not Gv.has_edge(u, v):
-            Gv.add_edge(u, v,
-                driveCost=dcost,
-                flyCost=fcost,
-                swimCost=scost,
-                rollCost=rcost
-            )
-        else:
-            if dcost is not None:
-                Gv[u][v]['driveCost'] = dcost
-            if fcost is not None:
-                Gv[u][v]['flyCost'] = fcost
-            if scost is not None:
-                Gv[u][v]['swimCost'] = scost
-            if rcost is not None:
-                Gv[u][v]['rollCost'] = rcost
-
-    # Add drive edges
-    for (u, w), cost_d in drive.items():
-        add_or_update_edge(u, w, dcost=cost_d)
-    # Add fly edges
-    for (u, w), cost_f in fly.items():
-        add_or_update_edge(u, w, fcost=cost_f)
-    # Add swim edges
-    for (u, w), cost_s in swim.items():
-        add_or_update_edge(u, w, scost=cost_s)
-    # Add roll edges
-    for (u, w), cost_r in roll.items():
-        add_or_update_edge(u, w, rcost=cost_r)
-
-    # Optionally add reverse edges with None so they're visible in the final plot
-    all_edges = list(Gv.edges())
-    for (u, w) in all_edges:
-        if not Gv.has_edge(w, u):
-            Gv.add_edge(w, u, 
-                driveCost=None, 
-                flyCost=None, 
-                swimCost=None,
-                rollCost=None
-            )
-
-    return Gv
-
-G_visual = build_visual_graph(drive_edges, fly_edges, swim_edges, roll_edges)
+    return (math.inf,[],set())
 
 
-###############################################################################
-# 4) Convert layered path => original edges, find mode-switch nodes, then plot
-###############################################################################
 
-def layered_path_to_original_edges(path):
-    """
-    Convert layered path (e.g. [(1,'D'), (2,'D'), (2,'R'), (4,'R'), (6,'R'), ...])
-    to actual edges (u->v) in the original node space, ignoring mode-switch steps.
-    """
-    edges = []
-    for i in range(len(path) - 1):
-        (u_node, u_mode) = path[i]
-        (v_node, v_mode) = path[i+1]
-        # Actual travel if node changes AND mode is the same
-        if u_node != v_node and u_mode == v_mode:
-            edges.append((u_node, v_node))
-    return edges
+
+# 1) Build the world & layered
+G_world=build_world_graph()
+L=build_layered_graph(G_world)
+
+# 2) Battery Dijkstra
+best_time, path_states, recharge_set = layered_dijkstra_with_battery(
+    L, 1,'drive', 8,'drive', battery_capacity=30.0, recharge_time=5000.0
+)
+
+
+# 3) Compute total energy (just the sum of each traveled edge's energy_Wh)
+total_energy = 0.0
+for i in range(len(path_states) - 1):
+    (u_node, u_mode) = path_states[i]
+    (v_node, v_mode) = path_states[i+1]
+    # skip mode-switch edges => same node
+    if u_node != v_node and u_mode == v_mode:
+        # Summation from L
+        if L.has_edge((u_node,u_mode), (v_node,v_mode)):
+            edge_en = L[(u_node,u_mode)][(v_node,v_mode)].get('energy_Wh', 0.0)
+            total_energy += edge_en
+
 
 def find_mode_switch_nodes(path):
+    s=set()
+    for i in range(len(path)-1):
+        (u_node,u_mode)=path[i]
+        (v_node,v_mode)=path[i+1]
+        if (u_node==v_node) and (u_mode!=v_mode):
+            s.add(u_node)
+    return s
+
+
+switch_nodes = find_mode_switch_nodes(path_states)
+
+
+print("=== LAYERED DIJKSTRA WITH BATTERY ===")
+print(f"Best time: {best_time:.1f}s")
+print(f"Total used energy: {total_energy:.3f} Wh")
+print("Path:", path_states)
+print("Switch nodes (IDs):", switch_nodes)
+print("Recharge nodes (IDs):", recharge_set)
+
+
+
+
+
+
+def layered_path_to_mode_edges(path):
     """
-    Return a set of node IDs where the mode changes (v,D)->(v,F) etc.
+    Return a list of ((u->v), mode) for actual traveled edges,
+    ignoring mode-switch edges.
     """
-    switches = set()
-    for i in range(len(path) - 1):
-        (u_node, u_mode) = path[i]
-        (v_node, v_mode) = path[i+1]
-        if u_node == v_node and u_mode != v_mode:
-            switches.add(u_node)
-    return switches
+    edges_modes=[]
+    for i in range(len(path)-1):
+        (u_node,u_mode)=path[i]
+        (v_node,v_mode)=path[i+1]
+        if (u_node!=v_node) and (u_mode==v_mode):
+            edges_modes.append(((u_node,v_node),u_mode))
+    return edges_modes
 
-highlight_edges = layered_path_to_original_edges(layered_path)
-switch_nodes = find_mode_switch_nodes(layered_path)
+edges_modes = layered_path_to_mode_edges(path_states)
 
-def format_label(dcost, fcost, scost, rcost):
+# Build a dictionary of edges per mode so we can color them
+edges_by_mode = {
+    'drive':[],
+    'swim':[],
+    'roll':[],
+    'fly': []
+}
+for ((u,v), mode) in edges_modes:
+    edges_by_mode[mode].append((u,v))
+
+
+
+
+
+
+def short_mode_name(mode):
+    # e.g. drive->D, fly->F, etc.
+    return {
+        'drive':'D',
+        'fly':'F',
+        'swim':'S',
+        'roll':'R'
+    }.get(mode,'?')
+
+def build_edge_labels_for_world(G_world, L):
     """
-    Return a label string only for valid costs out of {D, F, S, R}.
-      - If dcost is not None: "<dcost>(D)"
-      - If fcost is not None: "<fcost>(F)"
-      - If scost is not None: "<scost>(S)"
-      - If rcost is not None: "<rcost>(R)"
-    Join by ", ". If none exist, return "".
+    Returns a dict edge_labels for G_world, where each edge (u,v)
+    has a multiline label:
+
+      --> M1(...), M2(...)
+      dist(terrain)
+      <-- M3(...), M4(...)
+
+    forward costs gather from L[(u,mode) -> (v,mode)],
+    backward costs from L[(v,mode) -> (u,mode)].
+    The time & energy are stored in 'time','energy_Wh'.
     """
-    parts = []
-    if dcost is not None:
-        parts.append(f"{dcost}(D)")
-    if fcost is not None:
-        parts.append(f"{fcost}(F)")
-    if scost is not None:
-        parts.append(f"{scost}(S)")
-    if rcost is not None:
-        parts.append(f"{rcost}(R)")
-    return ", ".join(parts)
+    edge_labels = {}
 
-# Plot
-pos = nx.spring_layout(G_visual, seed=42)
-plt.figure(figsize=(10,7))
-plt.title("Drive / Fly / Swim / Roll (Both Directions)")
+    for (u,v) in G_world.edges():
+        dist   = G_world[u][v]['distance']
+        terr   = G_world[u][v]['terrain']
+        hu     = G_world.nodes[u]['height']
+        hv     = G_world.nodes[v]['height']
 
-# Distinguish switch nodes (light blue) from normal nodes (light green)
-normal_nodes = [n for n in G_visual.nodes() if n not in switch_nodes]
-nx.draw_networkx_nodes(G_visual, pos, nodelist=normal_nodes,
-                       node_color='lightgreen', node_size=600)
-nx.draw_networkx_nodes(G_visual, pos, nodelist=switch_nodes,
-                       node_color='lightblue', node_size=600)
+        # gather forward
+        forward_items = []
+        backward_items = []
 
-nx.draw_networkx_labels(G_visual, pos, font_weight='bold', font_size=10)
+        # We can loop over each mode in L, but typically we'll check L.has_edge((u,mode),(v,mode)).
+        # We'll gather all feasible modes from L's node set
+        for (node, mode) in L.nodes():
+            # node can be 1..8, mode can be 'drive','fly','swim','roll', etc.
+            if node==u:
+                # check if there's an edge ((u,mode)->(v,mode)) in L
+                if L.has_edge((u,mode),(v,mode)):
+                    t  = L[(u,mode)][(v,mode)]['time']
+                    eW = L[(u,mode)][(v,mode)].get('energy_Wh',0.0)
+                    short_m = short_mode_name(mode)
+                    forward_items.append(f"{short_m}({t:.0f}s,{eW:.1f}Wh)")
 
-# Draw edges in gray
-nx.draw_networkx_edges(G_visual, pos, edge_color='gray',
-                       arrows=True, arrowstyle='-|>')
+            if node==v:
+                # check (v,mode)->(u,mode) for backward
+                if L.has_edge((v,mode),(u,mode)):
+                    t  = L[(v,mode)][(u,mode)]['time']
+                    eW = L[(v,mode)][(u,mode)].get('energy_Wh',0.0)
+                    short_m = short_mode_name(mode)
+                    backward_items.append(f"{short_m}({t:.0f}s,{eW:.1f}Wh)")
 
-# Build edge labels
-edge_labels = {}
-for (u, w) in G_visual.edges():
-    dC = G_visual[u][w].get('driveCost', None)
-    fC = G_visual[u][w].get('flyCost', None)
-    sC = G_visual[u][w].get('swimCost', None)
-    rC = G_visual[u][w].get('rollCost', None)
-    label = format_label(dC, fC, sC, rC)
-    edge_labels[(u, w)] = label
+        # Build multiline label
+        # top line: --> forward modes
+        # mid line: dist(terrain)
+        # bot line: <-- backward modes
+        top_line = f"--> {', '.join(forward_items)}" if forward_items else ""
+        mid_line = f"{dist}({terr})"
+        bot_line = f"<-- {', '.join(backward_items)}" if backward_items else ""
 
-nx.draw_networkx_edge_labels(G_visual, pos,
-    edge_labels=edge_labels,
-    font_color='black',
-    font_size=9,
-    label_pos=0.3
-)
+        label_str = "\n".join(line for line in [top_line,mid_line,bot_line] if line)
 
-# Highlight the traveled edges in red
-nx.draw_networkx_edges(G_visual, pos,
-    edgelist=highlight_edges,
-    edge_color='red',
-    width=2.5,
-    arrowstyle='-|>'
-)
+        edge_labels[(u,v)] = label_str
 
-plt.axis('off')
-plt.show()
+
+    return edge_labels
+
+
+def visualize_world_with_multiline(
+    G_world,
+    edges_by_mode=None,
+    switch_nodes=None,
+    recharge_nodes=None,
+    L=None,
+    title="World Graph with Costs"
+):
+    """
+    We build edge_labels using build_edge_labels_for_world(...),
+    then plot G_world with those multiline labels.
+    highlight_edges => color them in red (or by mode if you want).
+    switch_nodes => color in lightblue
+    recharge_nodes => color in orange
+    """
+    if switch_nodes is None:
+        switch_nodes = set()
+    if recharge_nodes is None:
+        recharge_nodes = set()
+
+    # We gather the multiline labels from the layered graph
+    edge_labels = build_edge_labels_for_world(G_world, L)
+
+    pos = nx.spring_layout(G_world, seed=42)
+    plt.figure(figsize=(10,10))
+    plt.title(title)
+
+    nx.draw_networkx_nodes(G_world, pos,
+                           nodelist=G_world.nodes(),
+                           node_color='lightgreen',
+                           node_size=600)
+
+    node_labels = {}
+    for n in G_world.nodes():
+        height_val = G_world.nodes[n]['height']
+        switch_str = "yes" if n in switch_nodes else "no"
+        recharge_str = "yes" if n in recharge_nodes else "no"
+        # Two-line string with '\n'
+        node_labels[n] = f"{n}, {height_val}m\n({switch_str},{recharge_str})"
+
+    # Draw the node labels (multiline is recognized by networkx if we use "\n")
+    nx.draw_networkx_labels(
+        G_world, pos,
+        labels=node_labels,
+        font_size=10,
+        font_color='black'
+    )
+
+
+
+    # Edges in gray by default
+    nx.draw_networkx_edges(G_world, pos, edge_color='gray')
+
+    # color traveled edges by mode
+    color_map={'fly':'red','roll':'yellow','drive':'lightgreen','swim':'blue'}
+    for mode, edgelist in edges_by_mode.items():
+        c = color_map.get(mode,'black')
+        nx.draw_networkx_edges(G_world, pos,
+                               edgelist=edgelist,
+                               edge_color=c,
+                               width=2.5)
+
+
+
+
+    # Now add the multiline label
+    nx.draw_networkx_edge_labels(G_world, pos,
+        edge_labels=edge_labels,
+        rotate=False,
+        font_color='black',
+        font_size=7,
+        label_pos=0.5
+    )
+
+
+    legend_text = (
+        "Nodes:\n"
+        "<ID>, <height>m\n"
+        "(switch=?, recharge=?)\n\n"
+        "Modes:\n"
+        "  D(riving), R(olling), \n  F(lying), S(wimming)\n\n"
+        f"Mode switch: ({SWITCH_TIME:.0f}s, {SWITCH_ENERGY:.1f}Wh)\n"
+        f"Recharging: {RECHARGE_TIME:.0f}s\n"
+    )
+
+    ax = plt.gca()
+    # (x=1.0, y=1.0) => top-right corner in axes coordinates
+    ax.text(
+        0.0, 1.0,
+        legend_text,
+        transform=ax.transAxes,
+        verticalalignment='top',
+        horizontalalignment='left',
+        fontsize=8,
+        color='black',
+        bbox=dict(boxstyle='round,pad=0.2', fc='white', alpha=0.7)
+    )
+
+
+
+    plt.axis('off')
+    plt.show()
+
+
+visualize_world_with_multiline(G_world, edges_by_mode, switch_nodes, recharge_set, L)
 
 # %%
+
