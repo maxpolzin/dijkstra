@@ -50,15 +50,26 @@ def build_world_graph():
     return G
 
 
+
+
+
+
+
+
+
+
+
+
+
 ###############################################################################
 # 2) BUILD LAYERED GRAPH (WITH BATTERY)
 ###############################################################################
 
 MODES = {
     'fly':   {'speed': 5.0,  'power': 1000.0},  # m/s, W
-    'swim':  {'speed': 0.5,  'power':   10.0},
+    'swim':  {'speed': 0.5,  'power':   10.0}, # Try 0.15 vs 0.16
     'roll':  {'speed': 3.0,  'power':    1.0},
-    'drive': {'speed': 1.0,  'power':   50.0},
+    'drive': {'speed': 1.0,  'power':   30.0},
 }
 
 SWITCH_TIME   = 100.0   # s time penalty for mode switch
@@ -230,7 +241,7 @@ L=build_layered_graph(G_world)
 
 # 2) Battery Dijkstra
 best_time, path_states, recharge_set = layered_dijkstra_with_battery(
-    L, 1,'drive', 8,'drive', battery_capacity=30.0, recharge_time=5000.0
+    L, 1,'drive', 8,'drive', battery_capacity=BATTERY_CAPACITY, recharge_time=RECHARGE_TIME
 )
 
 
@@ -443,7 +454,8 @@ def visualize_world_with_multiline(
         rotate=False,
         font_color='black',
         font_size=7,
-        label_pos=0.5
+        label_pos=0.5,
+        bbox=dict(facecolor='white', edgecolor='none', alpha=0.7)
     )
 
 
@@ -458,7 +470,6 @@ def visualize_world_with_multiline(
     )
 
     ax = plt.gca()
-    # (x=1.0, y=1.0) => top-right corner in axes coordinates
     ax.text(
         0.0, 1.0,
         legend_text,
