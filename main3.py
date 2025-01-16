@@ -464,7 +464,7 @@ def visualize_world_with_multiline(
         "<ID>, <height>m\n"
         "(switch=?, recharge=?)\n\n"
         "Modes:\n"
-        "  D(riving), R(olling), \n  F(lying), S(wimming)\n\n"
+        "  D(riving): green\n  R(olling): yellow\n  F(lying): red\n  S(wimming): blue\n\n"
         f"Mode switch: ({SWITCH_TIME:.0f}s, {SWITCH_ENERGY:.1f}Wh)\n"
         f"Recharging: {RECHARGE_TIME:.0f}s\n"
     )
