@@ -74,7 +74,7 @@ MODES = {
 
 SWITCH_TIME   = 0.0   # s time penalty for mode switch
 SWITCH_ENERGY = 2.0     # Wh penalty for switching
-BATTERY_CAPACITY=2.6   # Wh
+BATTERY_CAPACITY=3.7   # Wh
 RECHARGE_TIME=5000.0    # s
 
 def is_edge_allowed(mode, terrain, h1, h2, dist, power):
@@ -247,28 +247,16 @@ def layered_dijkstra_with_battery(L, start_node, start_mode, goal_node, goal_mod
             edge_energy = edge_data.get('energy_Wh', 0.0)
             (nbr_node, nbr_mode) = nbr
 
-            # **Safety Check**: Skip edges that require more energy than battery capacity
-            if edge_energy > battery_capacity:
-                print(f"Skipping edge {(cur_node, nbr_node)} in mode '{cur_mode}' due to excessive energy requirement: {edge_energy:.3f} Wh")
-                continue
-
-            if (nbr_mode == cur_mode) and (nbr_node != cur_node):
-                if cur_used + edge_energy <= battery_capacity:
-                    # No need to recharge
-                    new_used = cur_used + edge_energy
-                    new_time = cur_time + edge_time
-                    did_recharge = False
-                else:
-                    # Need to recharge at current node before traversing
-                    new_time = cur_time + recharge_time + edge_time
-                    new_used = edge_energy
-                    did_recharge = True  # Recharge occurred at current node
-                next_state = (nbr_node, nbr_mode, new_used)
-            else:
-                # Mode switch or staying at the same node
+            if cur_used + edge_energy <= battery_capacity:
+                new_used = cur_used + edge_energy
                 new_time = cur_time + edge_time
-                next_state = (nbr_node, nbr_mode, cur_used)
                 did_recharge = False
+            else:
+                new_time = cur_time + recharge_time + edge_time
+                new_used = edge_energy
+                did_recharge = True
+
+            next_state = (nbr_node, nbr_mode, new_used)
 
             # Update distance and predecessors if a better path is found
             if new_time < dist.get(next_state, math.inf):
@@ -319,16 +307,23 @@ def find_mode_switch_nodes(path):
 switch_nodes = find_mode_switch_nodes(path_states)
 
 
+sorted_recharge_set = []
+for node_mode in path_states:
+    if node_mode in recharge_set and node_mode not in sorted_recharge_set:
+        sorted_recharge_set.append(node_mode)
+
+
 print("=== LAYERED DIJKSTRA WITH BATTERY ===")
 print(f"Best time: {best_time:.1f}s")
 print(f"Total used energy: {total_energy:.3f} Wh")
 print("Path:", path_states)
 print("Switch nodes (IDs):", switch_nodes)
-# print("Recharge nodes (IDs):", recharge_set)
 
 print("Recharge events (node, mode):")
-for node_mode in recharge_set:
+for node_mode in sorted_recharge_set:
     print(f" - Recharged at node {node_mode[0]} in mode '{node_mode[1]}'")
+
+
 
 
 
