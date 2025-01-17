@@ -72,9 +72,9 @@ MODES = {
     'drive': {'speed': 1.0,  'power':   30.0},
 }
 
-SWITCH_TIME   = 0.0   # s time penalty for mode switch
-SWITCH_ENERGY = 2.0     # Wh penalty for switching
-BATTERY_CAPACITY=3.7   # Wh
+SWITCH_TIME   = 100.0   # s time penalty for mode switch
+SWITCH_ENERGY = 1.0     # Wh penalty for switching
+BATTERY_CAPACITY=3   # Wh
 RECHARGE_TIME=5000.0    # s
 
 def is_edge_allowed(mode, terrain, h1, h2, dist, power):
@@ -498,8 +498,6 @@ def build_node_labels(G_world, switch_nodes, recharge_nodes):
 
 
 
-# %%
-
 def visualize_world_with_multiline(
     G_world,
     edges_by_mode=None,
@@ -573,7 +571,7 @@ def visualize_world_with_multiline(
     legend_text = (
         "Nodes:\n"
         "<ID>, <height>m\n"
-        "(switch=?, recharge=?)\n\n"
+        "    (recharge=?)\n\n"
         "Modes:\n"
         "  D(riving): green\n  R(olling): yellow\n  F(lying): red\n  S(wimming): blue\n\n"
         f"Mode switch: ({SWITCH_TIME:.0f}s, {SWITCH_ENERGY:.1f}Wh)\n"
