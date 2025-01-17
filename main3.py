@@ -29,7 +29,7 @@ def build_world_graph():
     edges = [
         (1, 2, 200, "grass"),
         (3, 4, 400, "grass"),
-        (4, 7, 500, "grass"),
+        (4, 7, 50, "grass"),
         (7, 8, 200, "grass"),
 
         (2, 5, 300, "water"),
@@ -75,7 +75,7 @@ MODES = {
 SWITCH_TIME   = 100.0   # s time penalty for mode switch
 SWITCH_ENERGY = 1.0     # Wh penalty for switching
 BATTERY_CAPACITY=3   # Wh
-RECHARGE_TIME=5000.0    # s
+RECHARGE_TIME=1000.0    # s
 
 def is_edge_allowed(mode, terrain, h1, h2, dist, power):
     """
@@ -248,10 +248,22 @@ def layered_dijkstra_with_battery(L, start_node, start_mode, goal_node, goal_mod
                 new_used = cur_used + edge_energy
                 new_time = cur_time + edge_time
                 did_recharge = False
+            # else:
+            #     new_time = cur_time + recharge_time + edge_time
+            #     new_used = edge_energy
+            #     did_recharge = True
+
             else:
-                new_time = cur_time + recharge_time + edge_time
-                new_used = edge_energy
-                did_recharge = True
+                # energy_deficit = (battery_capacity - cur_used)
+            
+                recharge_time_adjusted = (cur_used / battery_capacity) * recharge_time
+                
+                new_time = cur_time + recharge_time_adjusted + edge_time
+                new_used = edge_energy  # After recharge, used_energy is set to edge_energy
+                did_recharge = True  # Recharge occurred at current node
+
+
+
 
             next_state = (nbr_node, nbr_mode, new_used)
 
@@ -282,13 +294,12 @@ best_time, path_states, recharge_set = layered_dijkstra_with_battery(
 total_energy = 0.0
 for i in range(len(path_states) - 1):
     (u_node, u_mode) = path_states[i]
-    (v_node, v_mode) = path_states[i+1]
-    # skip mode-switch edges => same node
-    if u_node != v_node and u_mode == v_mode:
-        # Summation from L
-        if L.has_edge((u_node,u_mode), (v_node,v_mode)):
-            edge_en = L[(u_node,u_mode)][(v_node,v_mode)].get('energy_Wh', 0.0)
-            total_energy += edge_en
+    (v_node, v_mode) = path_states[i + 1]
+    
+    # Include all edges, including mode-switch edges
+    if L.has_edge((u_node, u_mode), (v_node, v_mode)):
+        edge_en = L[(u_node, u_mode)][(v_node, v_mode)].get('energy_Wh', 0.0)
+        total_energy += edge_en
 
 
 def find_mode_switch_nodes(path):
@@ -442,26 +453,29 @@ def get_recharge_status(path_states, recharge_set, switch_nodes):
     # Initialize a dictionary to track recharge events per node
     status_dict = {node: set() for node, _ in path_states}
 
+    # Keep track of recharge events that have been assigned
+    assigned_recharges = set()
+
     # Iterate through consecutive pairs in the path to identify recharge events
     for i in range(len(path_states) - 1):
         current_node, current_mode = path_states[i]
         next_node, next_mode = path_states[i + 1]
 
-        if current_node != next_node:
-            # Traveling to a different node in the same mode
-            if (current_node, current_mode) in recharge_set:
-                if current_node not in switch_nodes:
-                    # Independent recharge (not related to mode switching)
-                    status_dict[current_node].add('yes')
-                # Recharges at switch nodes during traveling are not categorized
-        else:
-            # Mode switching at the same node
-            # Check for recharge before switching modes
-            if (current_node, current_mode) in recharge_set:
+        if current_node in switch_nodes:
+            # Assign 'before' if recharge occurred before switching modes
+            if (current_node, current_mode) in recharge_set and (current_node, current_mode) not in assigned_recharges:
                 status_dict[current_node].add('before')
-            # Check for recharge after switching modes
-            if (current_node, next_mode) in recharge_set:
+                assigned_recharges.add((current_node, current_mode))
+
+            # Assign 'after' if recharge occurred after switching modes
+            if (current_node, next_mode) in recharge_set and (current_node, next_mode) not in assigned_recharges:
                 status_dict[current_node].add('after')
+                assigned_recharges.add((current_node, next_mode))
+
+    # Assign 'yes' for recharges at nodes that are not switch nodes
+    for (node, mode) in recharge_set:
+        if node not in switch_nodes and (node, mode) not in assigned_recharges:
+            status_dict[node].add('yes')
 
     # Finalize the recharge status labels
     final_status = {}
@@ -482,6 +496,7 @@ def get_recharge_status(path_states, recharge_set, switch_nodes):
                 final_status[node] = 'no'
 
     return final_status
+
 
 
 
@@ -570,12 +585,11 @@ def visualize_world_with_multiline(
 
     legend_text = (
         "Nodes:\n"
-        "<ID>, <height>m\n"
-        "    (recharge=?)\n\n"
+        "<ID>, <height>\n (recharge=?)\n\n"
         "Modes:\n"
         "  D(riving): green\n  R(olling): yellow\n  F(lying): red\n  S(wimming): blue\n\n"
         f"Mode switch: ({SWITCH_TIME:.0f}s, {SWITCH_ENERGY:.1f}Wh)\n"
-        f"Recharging: {RECHARGE_TIME:.0f}s\n"
+        f"Battery: ({RECHARGE_TIME:.0f}s, {BATTERY_CAPACITY:.0f}Wh)\n"
     )
 
     ax = plt.gca()
