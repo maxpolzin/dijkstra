@@ -73,7 +73,7 @@ MODES = {
 }
 
 SWITCH_TIME   = 0.0   # s time penalty for mode switch
-SWITCH_ENERGY = 1.0     # Wh penalty for switching
+SWITCH_ENERGY = 2.0     # Wh penalty for switching
 BATTERY_CAPACITY=2.6   # Wh
 RECHARGE_TIME=5000.0    # s
 
@@ -141,8 +141,8 @@ def build_layered_graph(G_world):
                         energy_Wh=energy_Wh,
                         terrain=terr
                     )
-                else:
-                    print(f"Excluded edge {(u, v)} in mode '{mode}' due to high energy requirement: {energy_Wh:.3f} Wh")
+                # else:
+                #     print(f"Excluded edge {(u, v)} in mode '{mode}' due to high energy requirement: {energy_Wh:.3f} Wh")
 
             # Backward direction (v -> u)
             if is_edge_allowed(mode, terr, hv, hu, dist, power):
@@ -157,8 +157,8 @@ def build_layered_graph(G_world):
                         energy_Wh=energy_Wh,
                         terrain=terr
                     )
-                else:
-                    print(f"Excluded edge {(v, u)} in mode '{mode}' due to high energy requirement: {energy_Wh:.3f} Wh")
+                # else:
+                #     print(f"Excluded edge {(v, u)} in mode '{mode}' due to high energy requirement: {energy_Wh:.3f} Wh")
 
     # 3) Add mode-switch edges with energy and time constraints
     for node in G_world.nodes():
@@ -176,8 +176,8 @@ def build_layered_graph(G_world):
                             energy_Wh=switch_energy_wh,
                             terrain='switch'
                         )
-                    else:
-                        print(f"Excluded mode-switch at node {node} from '{m1}' to '{m2}' due to high energy requirement.")
+                    # else:
+                    #     print(f"Excluded mode-switch at node {node} from '{m1}' to '{m2}' due to high energy requirement.")
 
     return L
 
@@ -235,7 +235,7 @@ def layered_dijkstra_with_battery(L, start_node, start_mode, goal_node, goal_mod
                 path.append((c[0], c[1]))
                 p = pred.get(c, None)
                 if p is not None and recharged.get(c, False):
-                    recharge_set.add(p[0])  # Recharge occurred at predecessor node
+                    recharge_set.add((p[0], p[1]))
                 c = p
             path.reverse()
             return (final_time, path, recharge_set)
@@ -324,9 +324,11 @@ print(f"Best time: {best_time:.1f}s")
 print(f"Total used energy: {total_energy:.3f} Wh")
 print("Path:", path_states)
 print("Switch nodes (IDs):", switch_nodes)
-print("Recharge nodes (IDs):", recharge_set)
+# print("Recharge nodes (IDs):", recharge_set)
 
-
+print("Recharge events (node, mode):")
+for node_mode in recharge_set:
+    print(f" - Recharged at node {node_mode[0]} in mode '{node_mode[1]}'")
 
 
 
