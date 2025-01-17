@@ -182,11 +182,8 @@ def build_layered_graph(G_world):
     return L
 
 
-## TODO
 
-# Recharge before morphing, when energy is used up
 # Fail if no feasible path is found
-# Verify latest untracked changes work correctly
 
 
 
@@ -428,6 +425,81 @@ def build_edge_labels_for_world(G_world, L):
     return edge_labels
 
 
+
+def get_recharge_status(path_states, recharge_set, switch_nodes):
+    """
+    Determines the recharge status for each node in the path.
+    
+    Parameters:
+        path_states (list of tuples): List of (node, mode) representing the path.
+        recharge_set (set of tuples): Set of (node, mode) where recharging occurred.
+        switch_nodes (set): Set of node IDs where mode switches occur.
+        
+    Returns:
+        status_dict (dict): Dictionary mapping node to recharge status 
+                            ('before', 'after', 'both', 'yes', 'no').
+    """
+    # Initialize a dictionary to track recharge events per node
+    status_dict = {node: set() for node, _ in path_states}
+
+    # Iterate through consecutive pairs in the path to identify recharge events
+    for i in range(len(path_states) - 1):
+        current_node, current_mode = path_states[i]
+        next_node, next_mode = path_states[i + 1]
+
+        if current_node != next_node:
+            # Traveling to a different node in the same mode
+            if (current_node, current_mode) in recharge_set:
+                if current_node not in switch_nodes:
+                    # Independent recharge (not related to mode switching)
+                    status_dict[current_node].add('yes')
+                # Recharges at switch nodes during traveling are not categorized
+        else:
+            # Mode switching at the same node
+            # Check for recharge before switching modes
+            if (current_node, current_mode) in recharge_set:
+                status_dict[current_node].add('before')
+            # Check for recharge after switching modes
+            if (current_node, next_mode) in recharge_set:
+                status_dict[current_node].add('after')
+
+    # Finalize the recharge status labels
+    final_status = {}
+    for node, statuses in status_dict.items():
+        if node in switch_nodes:
+            if 'before' in statuses and 'after' in statuses:
+                final_status[node] = 'both'
+            elif 'before' in statuses:
+                final_status[node] = 'before'
+            elif 'after' in statuses:
+                final_status[node] = 'after'
+            else:
+                final_status[node] = 'no'
+        else:
+            if 'yes' in statuses:
+                final_status[node] = 'yes'
+            else:
+                final_status[node] = 'no'
+
+    return final_status
+
+
+
+def build_node_labels(G_world, switch_nodes, recharge_nodes):
+    recharge_status = get_recharge_status(path_states, recharge_set, switch_nodes)
+
+    node_labels = {}
+    for n in G_world.nodes():
+        height_val = G_world.nodes[n]['height']
+        recharge_str = recharge_status.get(n, 'no')
+        node_labels[n] = f"{n}, {height_val}m\n({recharge_str})"
+
+    return node_labels
+
+
+
+# %%
+
 def visualize_world_with_multiline(
     G_world,
     edges_by_mode=None,
@@ -450,6 +522,8 @@ def visualize_world_with_multiline(
 
     # We gather the multiline labels from the layered graph
     edge_labels = build_edge_labels_for_world(G_world, L)
+    node_labels = build_node_labels(G_world, switch_nodes, recharge_nodes)
+
 
     pos = nx.spring_layout(G_world, seed=42)
     plt.figure(figsize=(10,10))
@@ -460,19 +534,11 @@ def visualize_world_with_multiline(
                            node_color='lightgreen',
                            node_size=600)
 
-    node_labels = {}
-    for n in G_world.nodes():
-        height_val = G_world.nodes[n]['height']
-        switch_str = "yes" if n in switch_nodes else "no"
-        recharge_str = "yes" if n in recharge_nodes else "no"
-        # Two-line string with '\n'
-        node_labels[n] = f"{n}, {height_val}m\n({switch_str},{recharge_str})"
-
     # Draw the node labels (multiline is recognized by networkx if we use "\n")
     nx.draw_networkx_labels(
         G_world, pos,
         labels=node_labels,
-        font_size=10,
+        font_size=8,
         font_color='black'
     )
 
