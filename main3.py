@@ -72,91 +72,123 @@ MODES = {
     'drive': {'speed': 1.0,  'power':   30.0},
 }
 
-SWITCH_TIME   = 100.0   # s time penalty for mode switch
+SWITCH_TIME   = 0.0   # s time penalty for mode switch
 SWITCH_ENERGY = 1.0     # Wh penalty for switching
-BATTERY_CAPACITY=30.0   # Wh
+BATTERY_CAPACITY=2.6   # Wh
 RECHARGE_TIME=5000.0    # s
 
-def is_edge_allowed(mode, terrain, h1, h2):
+def is_edge_allowed(mode, terrain, h1, h2, dist, power):
     """
-    * fly => any terrain
-    * swim => only 'water'
-    * roll => slope => from h>h2 (downhill, e.g. 100->0)
-    * drive => 'grass','slope'
-    * cliff => only fly
+    Determines if an edge is allowed for a given mode based on terrain and height.
     """
-    if mode=='fly':
+    if mode == 'fly':
         return True
-    if mode=='swim':
-        return (terrain=='water')
-    if mode=='roll':
-        if terrain=='slope' and (h1>h2):
-            return True
+    elif mode == 'swim':
+        return terrain == 'water'
+    elif mode == 'roll':
+        return h1 == 10 and h2 == 0  # downhill
+    elif mode == 'drive':
+        return terrain in ('grass', 'slope')
+    else:
         return False
-    if mode=='drive':
-        if terrain in ('grass','slope'):
-            return True
-        return False
-    return False
+
+
+def exceeds_battery_capacity(energy_wh, battery_capacity=BATTERY_CAPACITY):
+    return energy_wh > battery_capacity
+
 
 def build_layered_graph(G_world):
     """
-    Create a layered DiGraph L with nodes=(node, mode). 
-    For each feasible edge => 'time'=distance/speed, 'energy_Wh'=(power*time)/3600
-    Also add mode-switch edges => time=SWITCH_TIME, energy=SWITCH_ENERGY/3600 if you want.
+    Creates a layered DiGraph with nodes (node, mode).
+    Adds travel edges if allowed and within energy constraints.
+    Also adds mode-switch edges with their time and energy costs.
+    
+    Parameters:
+      - G_world (nx.Graph): The original world graph.
+    
+    Returns:
+      - L (nx.DiGraph): The layered graph incorporating modes and constraints.
     """
     L = nx.DiGraph()
     modes_list = list(MODES.keys())
 
-    # Layered nodes
+    # 1) Create layered nodes
     for v in G_world.nodes():
         for m in modes_list:
-            L.add_node((v,m))
+            L.add_node((v, m))
 
-    # Add "travel" edges if allowed
+    # 2) Add travel edges based on mode, terrain, height, distance, and energy constraints
     for (u, v) in G_world.edges():
-        dist=G_world[u][v]['distance']
-        terr=G_world[u][v]['terrain']
-        hu=G_world.nodes[u]['height']
-        hv=G_world.nodes[v]['height']
+        dist = G_world[u][v]['distance']
+        terr = G_world[u][v]['terrain']
+        hu = G_world.nodes[u]['height']
+        hv = G_world.nodes[v]['height']
 
         for mode in modes_list:
-            speed=MODES[mode]['speed']
-            power=MODES[mode]['power']
-            # forward
-            if is_edge_allowed(mode, terr, hu, hv):
-                t=dist/speed
-                eW=(power*t)/3600.0
-                L.add_edge(
-                    (u,mode),
-                    (v,mode),
-                    time=t,
-                    energy_Wh=eW
-                )
-            # backward
-            if is_edge_allowed(mode, terr, hv, hu):
-                t=dist/speed
-                eW=(power*t)/3600.0
-                L.add_edge(
-                    (v,mode),
-                    (u,mode),
-                    time=t,
-                    energy_Wh=eW
-                )
+            speed = MODES[mode]['speed']
+            power = MODES[mode]['power']
 
-    # Add mode-switch edges
+            # Forward direction (u -> v)
+            if is_edge_allowed(mode, terr, hu, hv, dist, power):
+                travel_time = dist / speed  # in seconds
+                energy_Wh = (power * travel_time) / 3600.0  # Convert to Wh
+
+                if not exceeds_battery_capacity(energy_Wh):
+                    L.add_edge(
+                        (u, mode),
+                        (v, mode),
+                        time=travel_time,
+                        energy_Wh=energy_Wh,
+                        terrain=terr
+                    )
+                else:
+                    print(f"Excluded edge {(u, v)} in mode '{mode}' due to high energy requirement: {energy_Wh:.3f} Wh")
+
+            # Backward direction (v -> u)
+            if is_edge_allowed(mode, terr, hv, hu, dist, power):
+                travel_time = dist / speed
+                energy_Wh = (power * travel_time) / 3600.0
+
+                if not exceeds_battery_capacity(energy_Wh):
+                    L.add_edge(
+                        (v, mode),
+                        (u, mode),
+                        time=travel_time,
+                        energy_Wh=energy_Wh,
+                        terrain=terr
+                    )
+                else:
+                    print(f"Excluded edge {(v, u)} in mode '{mode}' due to high energy requirement: {energy_Wh:.3f} Wh")
+
+    # 3) Add mode-switch edges with energy and time constraints
     for node in G_world.nodes():
         for m1 in modes_list:
             for m2 in modes_list:
-                if m1!=m2:
-                    L.add_edge(
-                        (node,m1),
-                        (node,m2),
-                        time=SWITCH_TIME,
-                        energy_Wh=(SWITCH_ENERGY/3600.0)
-                    )
+                if m1 != m2:
+                    switch_energy_wh = SWITCH_ENERGY  # Assuming SWITCH_ENERGY is defined in Wh
+                    switch_time = SWITCH_TIME      # Assuming SWITCH_TIME is defined in seconds
+
+                    if not exceeds_battery_capacity(switch_energy_wh):
+                        L.add_edge(
+                            (node, m1),
+                            (node, m2),
+                            time=switch_time,
+                            energy_Wh=switch_energy_wh,
+                            terrain='switch'
+                        )
+                    else:
+                        print(f"Excluded mode-switch at node {node} from '{m1}' to '{m2}' due to high energy requirement.")
 
     return L
+
+
+## TODO
+
+# Recharge before morphing, when energy is used up
+# Fail if no feasible path is found
+# Verify latest untracked changes work correctly
+
+
 
 
 ###############################################################################
@@ -169,68 +201,84 @@ def layered_dijkstra_with_battery(L, start_node, start_mode, goal_node, goal_mod
     """
     A Dijkstra that tracks battery usage in Wh:
       - State = (node, mode, used_energy).
-      - If used_energy+edge_energy>battery_capacity => recharge_time => used_energy=edge_energy
+      - If used_energy + edge_energy > battery_capacity => recharge at current node before traversing.
+      - Do not traverse edges where edge_energy > battery_capacity.
     Returns (best_time, path_list, recharge_nodes).
-    path_list is a list of (node,mode) ignoring used_energy,
+    path_list is a list of (node, mode) ignoring used_energy,
     recharge_nodes is a set of nodes where a recharge occurred.
     """
-    dist={}
-    pred={}
-    recharged={}
+    dist = {}
+    pred = {}
+    recharged = {}
 
-    source=(start_node, start_mode, 0.0)
-    dist[source]=0.0
-    pred[source]=None
-    recharged[source]=False
+    source = (start_node, start_mode, 0.0)
+    dist[source] = 0.0
+    pred[source] = None
+    recharged[source] = False
 
-    pq=[(0.0, source)]
+    pq = [(0.0, source)]
     while pq:
-        cur_time, (cur_node,cur_mode,cur_used)=heapq.heappop(pq)
-        if cur_time>dist[(cur_node,cur_mode,cur_used)]:
+        cur_time, (cur_node, cur_mode, cur_used) = heapq.heappop(pq)
+        
+        # Skip if we have already found a better path
+        if cur_time > dist.get((cur_node, cur_mode, cur_used), math.inf):
             continue
-        if (cur_node==goal_node) and (cur_mode==goal_mode):
-            # reconstruct
-            final_time=cur_time
-            path=[]
-            recharge_set=set()
-            c=(cur_node,cur_mode,cur_used)
+        
+        # Check if we've reached the goal
+        if (cur_node == goal_node) and (cur_mode == goal_mode):
+            # Reconstruct the path
+            final_time = cur_time
+            path = []
+            recharge_set = set()
+            c = (cur_node, cur_mode, cur_used)
             while c is not None:
-                path.append((c[0],c[1]))
-                if recharged.get(c,False):
-                    recharge_set.add(c[0])
-                c=pred.get(c,None)
+                path.append((c[0], c[1]))
+                p = pred.get(c, None)
+                if p is not None and recharged.get(c, False):
+                    recharge_set.add(p[0])  # Recharge occurred at predecessor node
+                c = p
             path.reverse()
             return (final_time, path, recharge_set)
 
-        # explore
-        for nbr in L.successors((cur_node,cur_mode)):
-            edge_time=L[(cur_node,cur_mode)][nbr]['time']
-            edge_energy=L[(cur_node,cur_mode)][nbr].get('energy_Wh',0.0)
-            (nbr_node,nbr_mode)=nbr
+        # Explore neighbors
+        for nbr in L.successors((cur_node, cur_mode)):
+            edge_data = L[(cur_node, cur_mode)][nbr]
+            edge_time = edge_data['time']
+            edge_energy = edge_data.get('energy_Wh', 0.0)
+            (nbr_node, nbr_mode) = nbr
 
-            if (nbr_mode==cur_mode) and (nbr_node!=cur_node):
-                if cur_used+edge_energy<=battery_capacity:
-                    new_used=cur_used+edge_energy
-                    new_time=cur_time+edge_time
-                    did_recharge=False
+            # **Safety Check**: Skip edges that require more energy than battery capacity
+            if edge_energy > battery_capacity:
+                print(f"Skipping edge {(cur_node, nbr_node)} in mode '{cur_mode}' due to excessive energy requirement: {edge_energy:.3f} Wh")
+                continue
+
+            if (nbr_mode == cur_mode) and (nbr_node != cur_node):
+                if cur_used + edge_energy <= battery_capacity:
+                    # No need to recharge
+                    new_used = cur_used + edge_energy
+                    new_time = cur_time + edge_time
+                    did_recharge = False
                 else:
-                    new_time=cur_time+recharge_time+edge_time
-                    new_used=edge_energy
-                    did_recharge=True
-                next_state=(nbr_node,nbr_mode,new_used)
+                    # Need to recharge at current node before traversing
+                    new_time = cur_time + recharge_time + edge_time
+                    new_used = edge_energy
+                    did_recharge = True  # Recharge occurred at current node
+                next_state = (nbr_node, nbr_mode, new_used)
             else:
-                new_time=cur_time+edge_time
-                next_state=(nbr_node,nbr_mode,cur_used)
-                did_recharge=False
+                # Mode switch or staying at the same node
+                new_time = cur_time + edge_time
+                next_state = (nbr_node, nbr_mode, cur_used)
+                did_recharge = False
 
-            old_val=dist.get(next_state,math.inf)
-            if new_time<old_val:
-                dist[next_state]=new_time
-                pred[next_state]=(cur_node,cur_mode,cur_used)
-                recharged[next_state]=did_recharge
-                heapq.heappush(pq,(new_time,next_state))
+            # Update distance and predecessors if a better path is found
+            if new_time < dist.get(next_state, math.inf):
+                dist[next_state] = new_time
+                pred[next_state] = (cur_node, cur_mode, cur_used)
+                recharged[next_state] = did_recharge
+                heapq.heappush(pq, (new_time, next_state))
 
-    return (math.inf,[],set())
+    return (math.inf, [], set())
+
 
 
 
