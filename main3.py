@@ -51,11 +51,78 @@ def build_world_graph():
 
 
 
+import networkx as nx
 
+def build_world_graph():
+    """
+    Creates an undirected 'world' graph with 9 nodes. Each node has a 'height' attribute 
+    with values in {0, 100}. Edges have 'distance' and 'terrain' attributes, where 
+    terrain can be 'water', 'cliff', 'grass', or 'slope'.
+    
+    Terrain Specifications:
+        - Grass: Distances between 300m and 700m
+        - Slope: Distances between 650m and 800m
+        - Water: Distances between 200m and 300m
+        - Cliff: Distances between 90m and 120m (shorter distances)
+    
+    Returns:
+        G (nx.Graph): The constructed world graph.
+    """
+    # Define node heights (only 0 or 100)
+    node_heights = {
+        1: 0,
+        2: 100,
+        3: 0,
+        4: 100,
+        5: 0,
+        6: 100,
+        7: 0,
+        8: 100,
+        9: 0
+    }
 
+    # Define edges with (node1, node2, distance in meters, terrain)
+    edges = [
+        # Grass terrains
+        (1, 3, 300, "grass"),
+        (3, 5, 400, "grass"),
+        (5, 7, 500, "grass"),
+        (7, 9, 600, "grass"),
+        (2, 4, 350, "grass"),
+        (4, 6, 450, "grass"),
+        (6, 8, 550, "grass"),
+        (8, 2, 700, "grass"),  # Loop back to node 2
 
+        # Water terrains
+        (1, 5, 200, "water"),
+        (5, 9, 300, "water"),
 
+        # Slope terrains
+        (1, 2, 500, "slope"),
+        (3, 4, 450, "slope"),
+        (5, 6, 300, "slope"),
+        (7, 8, 350, "slope"),
+        (9, 8, 300, "slope"),
 
+        # Cliff terrains (shorter distances)
+        (2, 3, 10, "cliff"),
+        (4, 5, 12, "cliff"),
+        (6, 7, 11, "cliff"),
+        (8, 9, 9, "cliff")
+    ]
+
+    # Initialize the graph
+    G = nx.Graph()
+
+    # Add nodes with height attributes
+    for node, height in node_heights.items():
+        G.add_node(node, height=height)
+
+    # Add edges with distance and terrain attributes
+    for u, v, dist, terr in edges:
+        G.add_edge(u, v, distance=dist, terrain=terr)
+
+    return G
 
 
 
@@ -74,7 +141,7 @@ MODES = {
 
 SWITCH_TIME   = 100.0   # s time penalty for mode switch
 SWITCH_ENERGY = 1.0     # Wh penalty for switching
-BATTERY_CAPACITY=3   # Wh
+BATTERY_CAPACITY=30   # Wh
 RECHARGE_TIME=1000.0    # s
 
 def is_edge_allowed(mode, terrain, h1, h2, dist, power):
@@ -183,13 +250,8 @@ def build_layered_graph(G_world):
 
 
 
-# Fail if no feasible path is found
-
-
-
-
 ###############################################################################
-# 3) LAYERED DIJKSTRA WITH BATTERY
+# 3) LAYERED DIJKSTRA WITH RECHARGING
 ###############################################################################
 
 def layered_dijkstra_with_battery(L, start_node, start_mode, goal_node, goal_mode,
@@ -214,15 +276,23 @@ def layered_dijkstra_with_battery(L, start_node, start_mode, goal_node, goal_mod
     recharged[source] = False
 
     pq = [(0.0, source)]
+    print(f"Initialized priority queue with source: {source} at time 0.0s")
+
     while pq:
-        cur_time, (cur_node, cur_mode, cur_used) = heapq.heappop(pq)
-        
+        cur_time, current_state = heapq.heappop(pq)
+        cur_node, cur_mode, cur_used = current_state
+        print(f"\nPopped state from queue: Node {cur_node}, Mode '{cur_mode}', Used Energy {cur_used:.2f} Wh, Current Time {cur_time:.2f}s")        
+
+
         # Skip if we have already found a better path
         if cur_time > dist.get((cur_node, cur_mode, cur_used), math.inf):
+            print(f" - Skipping state {current_state} as a better path was already found (dist={dist.get(current_state, math.inf):.2f}s)")
             continue
         
         # Check if we've reached the goal
         if (cur_node == goal_node) and (cur_mode == goal_mode):
+            print(f" - Reached goal: Node {goal_node}, Mode '{goal_mode}' at time {cur_time:.2f}s")
+
             # Reconstruct the path
             final_time = cur_time
             path = []
@@ -233,8 +303,11 @@ def layered_dijkstra_with_battery(L, start_node, start_mode, goal_node, goal_mod
                 p = pred.get(c, None)
                 if p is not None and recharged.get(c, False):
                     recharge_set.add((p[0], p[1]))
+                    print(f"   - Recharge occurred at Node {p[0]}, Mode '{p[1]}'")
                 c = p
             path.reverse()
+            print(f" - Reconstructed path: {path}")
+            print(f" - Recharge events: {recharge_set}")
             return (final_time, path, recharge_set)
 
         # Explore neighbors
@@ -244,24 +317,24 @@ def layered_dijkstra_with_battery(L, start_node, start_mode, goal_node, goal_mod
             edge_energy = edge_data.get('energy_Wh', 0.0)
             (nbr_node, nbr_mode) = nbr
 
+            print(f"   - Exploring neighbor: Node {nbr_node}, Mode '{nbr_mode}', Edge Time {edge_time:.2f}s, Edge Energy {edge_energy:.2f} Wh")
+
             if cur_used + edge_energy <= battery_capacity:
                 new_used = cur_used + edge_energy
                 new_time = cur_time + edge_time
                 did_recharge = False
-            # else:
-            #     new_time = cur_time + recharge_time + edge_time
-            #     new_used = edge_energy
-            #     did_recharge = True
+                print(f"     - No recharge needed. New Used Energy: {new_used:.2f} Wh, New Time: {new_time:.2f}s")
 
             else:
-                # energy_deficit = (battery_capacity - cur_used)
-            
                 recharge_time_adjusted = (cur_used / battery_capacity) * recharge_time
                 
                 new_time = cur_time + recharge_time_adjusted + edge_time
                 new_used = edge_energy  # After recharge, used_energy is set to edge_energy
                 did_recharge = True  # Recharge occurred at current node
 
+                print(f"     - Recharge needed. Energy Deficit: {cur_used:.2f} Wh")
+                print(f"       - Recharge Time Adjusted: {recharge_time_adjusted:.2f}s")
+                print(f"       - New Used Energy: {new_used:.2f} Wh, New Time: {new_time:.2f}s")
 
 
 
@@ -269,10 +342,18 @@ def layered_dijkstra_with_battery(L, start_node, start_mode, goal_node, goal_mod
 
             # Update distance and predecessors if a better path is found
             if new_time < dist.get(next_state, math.inf):
+
+                print(next_state)
+                
                 dist[next_state] = new_time
                 pred[next_state] = (cur_node, cur_mode, cur_used)
                 recharged[next_state] = did_recharge
                 heapq.heappush(pq, (new_time, next_state))
+                print(f"     - Updated state: {next_state} with time {new_time:.2f}s and {'recharged' if did_recharge else 'no recharge'}")
+
+            else:
+                print(f"     - Existing state {next_state} has better or equal time. Skipping update.")
+
 
     return (math.inf, [], set())
 
