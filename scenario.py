@@ -1,3 +1,6 @@
+
+# %%
+
 import networkx as nx
 import random
 
@@ -110,78 +113,19 @@ def build_world_graph(id=None):
         print("Built predefined scenario 0 with 8 nodes.")
         return G
 
-    elif id == 1:
-        # Second predefined scenario with 9 nodes
-        node_heights = {
-            0: 0,
-            1: 100,
-            2: 0,
-            3: 100,
-            4: 0,
-            5: 100,
-            6: 0,
-            7: 100,
-            8: 0
-        }
-
-        edges = [
-             # Grass terrains
-            (0, 2, 300, "grass"),
-            (2, 4, 400, "grass"),
-            (4, 6, 500, "grass"),
-            (6, 8, 600, "grass"),
-            (1, 3, 350, "grass"),
-            (3, 5, 450, "grass"),
-            (5, 7, 550, "grass"),
-            (7, 1, 700, "grass"),
-
-            # Water terrains
-            (0, 4, 200, "water"),
-            (4, 8, 300, "water"),
-
-            # Slope terrains
-            (0, 1, 500, "slope"),
-            (2, 3, 450, "slope"),
-            (4, 5, 300, "slope"),
-            (6, 7, 350, "slope"),
-            (8, 7, 300, "slope"),
-
-            # Cliff terrains (shorter distances)
-            (1, 2, 10, "cliff"),
-            (3, 4, 12, "cliff"),
-            (5, 6, 11, "cliff"),
-            (7, 8, 9, "cliff")
-
-        ]
-
-        G = nx.Graph()
-        for node, height in node_heights.items():
-            G.add_node(node, height=height)
-        for u, v, distance, terrain in edges:
-            G.add_edge(u, v, distance=distance, terrain=terrain)
-        
-        print("Built predefined scenario 1 with 9 nodes.")
-        return G
-
     else:
         raise ValueError(f"Invalid scenario id: {id}. Valid options are 0, 1, or None.")
 
-# Example usage:
-if __name__ == "__main__":
-    # Example: Build predefined scenario 0
-    G0 = build_world_graph(id=0)
-    print("\nScenario 0 Graph:")
-    print("Nodes:", G0.nodes(data=True))
-    print("Edges:", G0.edges(data=True))
-    
-    # Example: Build predefined scenario 1
-    G1 = build_world_graph(id=1)
-    print("\nScenario 1 Graph:")
-    print("Nodes:", G1.nodes(data=True))
-    print("Edges:", G1.edges(data=True))
-    
-    # Example: Build a random graph
-    Grandom = build_world_graph(id=None)
-    print("\nRandom Graph:")
-    print("Nodes:", Grandom.nodes(data=True))
-    print("Edges:", Grandom.edges(data=True))
+
+
+# # Example: Build predefined scenario 0
+# G0 = build_world_graph(id=0)
+# print("\nScenario 0 Graph:")
+# print("Nodes:", G0.nodes(data=True))
+# print("Edges:", G0.edges(data=True))
+
+# # Example: Build a random graph
+# Grandom = build_world_graph(id=None)
+# print("\nRandom Graph:")
+# print("Nodes:", Grandom.nodes(data=True))
+# print("Edges:", Grandom.edges(data=True))
