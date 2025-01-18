@@ -14,7 +14,7 @@ import random
 from scenario import build_world_graph
 
 
-G_world=build_world_graph(id=None)
+G_world=build_world_graph(id=1)
 
 
 ###############################################################################
@@ -82,6 +82,7 @@ def build_layered_graph(G_world):
 
     # 2) Add travel edges based on mode, terrain, height, distance, and energy constraints
     for (u, v) in G_world.edges():
+        
         dist = G_world[u][v]['distance']
         terr = G_world[u][v]['terrain']
         hu = G_world.nodes[u]['height']
@@ -582,7 +583,7 @@ def visualize_world_with_multiline(
 
     ax = plt.gca()
     ax.text(
-        0.0, 1.0,
+        0.0, 0.0,
         legend_text,
         transform=ax.transAxes,
         verticalalignment='top',
