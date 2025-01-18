@@ -3,6 +3,8 @@
 %reload_ext autoreload
 %autoreload 2
 
+# %matplotlib widget
+
 import math
 import heapq
 import networkx as nx
@@ -10,7 +12,6 @@ import matplotlib.pyplot as plt
 import random
 
 from scenario import build_world_graph
-
 
 
 G_world=build_world_graph(id=None)
@@ -29,23 +30,30 @@ MODES = {
 
 SWITCH_TIME   = 100.0   # s time penalty for mode switch
 SWITCH_ENERGY = 1.0     # Wh penalty for switching
-BATTERY_CAPACITY=10   # Wh
+BATTERY_CAPACITY=15   # Wh
 RECHARGE_TIME=1000.0    # s
 
 def is_edge_allowed(mode, terrain, h1, h2, dist, power):
     """
     Determines if an edge is allowed for a given mode based on terrain and height.
     """
+
     if mode == 'fly':
         return True
-    elif mode == 'swim':
-        return terrain == 'water'
-    elif mode == 'roll':
-        return h1 == 100 and h2 == 0  # downhill
-    elif mode == 'drive':
-        return terrain in ('grass', 'slope')
-    else:
-        return False
+
+    if terrain == 'water' and mode == 'swim':
+        return True
+
+    if terrain == 'slope':
+        if mode == 'drive':
+            return True
+        elif mode == 'roll':
+            return h1 == 100 and h2 == 0
+
+    if terrain == 'grass' and mode == 'drive':
+        return True
+
+    return False
 
 
 def exceeds_battery_capacity(energy_wh, battery_capacity=BATTERY_CAPACITY):
@@ -519,7 +527,7 @@ def visualize_world_with_multiline(
 
 
     pos = nx.spring_layout(G_world, seed=42)
-    plt.figure(figsize=(10,10))
+    plt.figure(figsize=(8,8))
     plt.title(title)
 
     nx.draw_networkx_nodes(G_world, pos,
