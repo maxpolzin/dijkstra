@@ -1,8 +1,13 @@
 
 # %%
 
+# %reload_ext autoreload
+# %autoreload 2
+
 import networkx as nx
 import random
+
+from visualize import visualize_world_with_multiline
 
 
 def determine_edge_attributes(u, v, G, terrain_specs):
@@ -20,7 +25,6 @@ def determine_edge_attributes(u, v, G, terrain_specs):
     distance = random.randint(*terrain_specs[terrain])
     
     return terrain, distance
-
 
 
 def generate_landscape_graph(num_nodes=8, 
@@ -72,8 +76,6 @@ def generate_landscape_graph(num_nodes=8,
 
 
 
-
-
 def build_world_graph(id=None):
 
     if id is None:
@@ -118,14 +120,6 @@ def build_world_graph(id=None):
 
 
 
-# # Example: Build predefined scenario 0
-# G0 = build_world_graph(id=0)
-# print("\nScenario 0 Graph:")
-# print("Nodes:", G0.nodes(data=True))
-# print("Edges:", G0.edges(data=True))
+# G = build_world_graph(id=None)
 
-# # Example: Build a random graph
-# Grandom = build_world_graph(id=None)
-# print("\nRandom Graph:")
-# print("Nodes:", Grandom.nodes(data=True))
-# print("Edges:", Grandom.edges(data=True))
+# visualize_world_with_multiline(G)

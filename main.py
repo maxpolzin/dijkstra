@@ -14,7 +14,7 @@ from scenario import build_world_graph
 from visualize import visualize_world_with_multiline
 
 
-G_world=build_world_graph(id=0)
+G_world=build_world_graph(id=None)
 
 
 ###############################################################################
@@ -334,7 +334,7 @@ for node_mode in sorted_recharge_set:
 
 visualize_world_with_multiline(G_world, path_states, switch_nodes, recharge_set, L, CONSTANTS)
 
-visualize_world_with_multiline(G_world)
+# visualize_world_with_multiline(G_world)
 
 #%%
 
