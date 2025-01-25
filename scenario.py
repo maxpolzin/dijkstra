@@ -120,6 +120,6 @@ def build_world_graph(id=None):
 
 
 
-# G = build_world_graph(id=None)
+G = build_world_graph(id=None)
 
-# visualize_world_with_multiline(G)
+visualize_world_with_multiline(G)

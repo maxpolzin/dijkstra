@@ -12,24 +12,6 @@ from dataclasses import dataclass, field
 from typing import Optional, Tuple, List, Dict
 
 ###############################################################################
-# Constants Definitions
-###############################################################################
-
-CONSTANTS = {
-    'SWITCH_TIME': 100.0,        # seconds time penalty for mode switch
-    'SWITCH_ENERGY': 1.0,        # Wh penalty for switching
-    'BATTERY_CAPACITY': 15.0,    # Wh
-    'RECHARGE_TIME': 1000.0,     # seconds
-    'MODES': {
-        'fly':   {'speed': 5.0,  'power': 1000.0},  # m/s, W
-        'swim':  {'speed': 0.5,  'power':   10.0},  # m/s, W
-        'roll':  {'speed': 3.0,  'power':    1.0},   # m/s, W
-        'drive': {'speed': 1.0,  'power':   30.0},   # m/s, W
-    }
-}
-
-
-###############################################################################
 # Terrain and DEM Generation Functions
 ###############################################################################
 
@@ -141,157 +123,8 @@ def visualize_world(dem, terrain, resolution_m=100):
 
     plt.show()
 
-###############################################################################
-# Simplified RRT* Algorithm Implementation
-###############################################################################
 
-@dataclass(order=True)
-class State:
-    used_time: float
-    position: Tuple[float, float, float] = field(compare=False)  # (x, y, z) in meters
-    parent: Optional['State'] = field(compare=False, default=None)
 
-class RRTStar:
-    def __init__(self, dem: np.ndarray, terrain: np.ndarray, constants: Dict):
-        self.dem = dem
-        self.terrain = terrain
-        self.constants = constants
-        self.start: Optional[State] = None
-        self.goal: Optional[State] = None
-        self.tree: List[State] = []
-        self.step_size = 10.0  # meters
-        self.max_iterations = 1000
-        self.goal_threshold = 10.0  # meters
-
-    def set_start(self, position: Tuple[float, float, float]):
-        self.start = State(used_time=0.0, position=position, parent=None)
-        self.tree.append(self.start)
-
-    def set_goal(self, position: Tuple[float, float, float]):
-        self.goal = State(used_time=0.0, position=position, parent=None)
-
-    def is_goal_reached(self, state: State) -> bool:
-        if not self.goal:
-            return False
-        distance = np.linalg.norm(np.array(state.position) - np.array(self.goal.position))
-        return distance <= self.goal_threshold  # meters
-
-    def sample_state(self) -> Tuple[float, float, float]:
-        """
-        Samples a random point within the world boundaries.
-
-        Returns:
-        - (x, y, z): Tuple of coordinates in meters.
-        """
-        x = np.random.uniform(0, 1000)
-        y = np.random.uniform(0, 1000)
-        z = np.random.uniform(0, 200)  # Assuming z up to 200 meters
-        return (x, y, z)
-
-    def nearest_neighbor(self, sampled_position: Tuple[float, float, float]) -> Optional[State]:
-        """
-        Finds the nearest neighbor in the tree to the sampled position.
-
-        Parameters:
-        - sampled_position (Tuple[float, float, float]): The (x, y, z) position to find the nearest neighbor for.
-
-        Returns:
-        - Optional[State]: The nearest neighbor state if found, else None.
-        """
-        min_dist = float('inf')
-        nearest = None
-        for node in self.tree:
-            dist = np.linalg.norm(np.array(node.position) - np.array(sampled_position))
-            if dist < min_dist:
-                min_dist = dist
-                nearest = node
-        return nearest
-
-    def steer(self, from_state: State, to_position: Tuple[float, float, float]) -> Optional[State]:
-        """
-        Attempts to move from `from_state` towards `to_position` by step_size.
-
-        Parameters:
-        - from_state (State): The current state.
-        - to_position (Tuple[float, float, float]): The target (x, y, z) position.
-
-        Returns:
-        - Optional[State]: The new state if the move is valid, else None.
-        """
-        direction = np.array(to_position) - np.array(from_state.position)
-        distance = np.linalg.norm(direction)
-        if distance == 0:
-            return None
-        direction = direction / distance  # Normalize
-
-        # Limit the step to step_size
-        step = min(self.step_size, distance)
-        new_position = np.array(from_state.position) + direction * step
-        new_position = tuple(new_position)
-
-        # Check boundaries
-        if not self.is_within_bounds(new_position):
-            return None
-
-        # Create new state
-        new_used_time = from_state.used_time + step  # Assuming used_time is the distance
-        new_state = State(
-            used_time=new_used_time,
-            position=new_position,
-            parent=from_state
-        )
-        return new_state
-
-    def is_within_bounds(self, position: Tuple[float, float, float]) -> bool:
-        x, y, z = position
-        return (0 <= x <= 1000) and (0 <= y <= 1000) and (0 <= z <= 200)
-
-    def build_tree(self) -> Optional[State]:
-        """
-        Builds the RRT* tree up to `max_iterations`.
-        Returns the goal state if reached, else None.
-        """
-        for i in range(self.max_iterations):
-            sampled_pos = self.sample_state()
-            nearest = self.nearest_neighbor(sampled_pos)
-            if nearest is None:
-                continue
-
-            new_state = self.steer(nearest, sampled_pos)
-            if new_state is not None:
-                self.tree.append(new_state)
-
-                # Check if goal is reached
-                if self.is_goal_reached(new_state):
-                    self.goal.parent = new_state
-                    self.goal.used_time = new_state.used_time + np.linalg.norm(np.array(new_state.position) - np.array(self.goal.position))
-                    self.tree.append(self.goal)
-                    return self.goal
-
-        return None  # Goal not reached within max_iterations
-
-    def extract_path(self, end_state: State) -> List[Tuple[float, float, float]]:
-        """
-        Extracts the path from start to end state.
-
-        Parameters:
-        - end_state (State): The goal state.
-
-        Returns:
-        - List of positions as tuples (x, y, z).
-        """
-        path = []
-        current = end_state
-        while current is not None:
-            path.append(current.position)
-            current = current.parent
-        path.reverse()
-        return path
-
-###############################################################################
-# Path Visualization Function (Removed as per user request)
-###############################################################################
-# The visualize_path function has been removed as per your instructions.
 
 ###############################################################################
 # Main Execution: Building, Visualizing the World and Running RRT*
@@ -301,34 +134,6 @@ def main():
     # 1. Build the world
     dem, terrain = build_world()
     visualize_world(dem, terrain, resolution_m=100)  # Each grid cell is 100m
-
-    # 2. Initialize RRT*
-    rrt_star = RRTStar(dem, terrain, CONSTANTS)
-
-    # 3. Define start and goal positions
-    # Start at (0, 0, 0) meters
-    start_position = (0.0, 0.0, 0.0)  # (x, y, z)
-    # Goal at (1000, 1000, 0) meters
-    goal_position = (1000.0, 1000.0, 0.0)  # (x, y, z)
-
-    rrt_star.set_start(start_position)
-    rrt_star.set_goal(goal_position)
-
-    # 4. Build the RRT* tree
-    goal_state = rrt_star.build_tree()
-    print("Tree size:", len(rrt_star.tree))
-    print("Goal state:", goal_state)
-
-    if goal_state:
-        print("Goal reached!")
-        path = rrt_star.extract_path(goal_state)
-        print("Path:")
-        for step in path:
-            print(f"Position: {step}")
-        
-        # Note: visualize_path has been removed as per your request.
-    else:
-        print("Goal not reached within the maximum number of iterations.")
 
 if __name__ == "__main__":
     main()
