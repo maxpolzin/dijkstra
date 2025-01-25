@@ -1,4 +1,11 @@
 #%%
+
+# %reload_ext autoreload
+# %autoreload 2
+
+# Uncomment the following line if you want interactive matplotlib widgets
+%matplotlib widget
+
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -15,8 +22,8 @@ def build_world():
     dem = np.zeros((size, size))
     terrain = np.full((size, size), 'grass', dtype=object)
 
-    river_start_x = 300
-    river_end_x   = 500
+    river_start_x = 200
+    river_end_x   = 350
     river_start_y = 0
     river_end_y   = 700
     dem[river_start_y:river_end_y, river_start_x:river_end_x] = 0
@@ -25,19 +32,19 @@ def build_world():
     plateau_start_y = 800
     plateau_end_y   = 1000
     plateau_start_x = 0
-    plateau_end_x   = 1000
+    plateau_end_x   = 850
     dem[plateau_start_y:plateau_end_y, plateau_start_x:plateau_end_x] = 100
 
-    slope_start_x = 600
-    slope_end_x   = 800
+    slope_start_x = 400
+    slope_end_x   = 700
     slope_start_y = 0
     slope_end_y   = 800
     for col in range(slope_start_x, slope_end_x):
         slope_height = ((col - slope_start_x + 1) / (slope_end_x - slope_start_x)) * 100
         dem[slope_start_y:slope_end_y, col] = slope_height
 
-    flat_start_x = 800
-    flat_end_x   = 1000
+    flat_start_x = 700
+    flat_end_x   = 850
     last_slope_height = dem[:, slope_end_x - 1].copy()
     dem[:, flat_start_x:flat_end_x] = last_slope_height[:, np.newaxis]
 
@@ -102,7 +109,7 @@ def visualize_world_and_path(dem, terrain, rrt_star, path=None):
     ax.set_ylabel('Y (m)')
     ax.set_zlabel('Elevation (m)')
     ax.set_title('World + RRT* Path (Surface Partially Transparent)')
-    ax.view_init(elev=45, azim=-110)
+    ax.view_init(elev=45, azim=-90)
 
     # Optionally adjust how Matplotlib orders 3D elements
     # ax.set_proj_type('ortho')        # Orthographic projection
@@ -292,7 +299,7 @@ def main():
 
     print("Start RRT* path planning in 3D, ensuring each node/edge is above ground")
 
-    rrt_star = RRTStar(start, goal, rand_area, expand_dis=5.0, dem=dem)
+    rrt_star = RRTStar(start, goal, rand_area, expand_dis=10.0, dem=dem)
 
     start_time = time.perf_counter()
     path = rrt_star.planning()
