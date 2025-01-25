@@ -7,17 +7,14 @@ import random
 import time
 
 ###############################################################################
-# World Building & Visualization in One Plot
+# World Building & Combined Visualization
 ###############################################################################
 
 def build_world():
-    # Increase to 1000x1000 so each cell is 1 meter
     size = 1000
     dem = np.zeros((size, size))
     terrain = np.full((size, size), 'grass', dtype=object)
 
-    # River: x=300..499, y=0..699
-    # (columns=300..499, rows=0..699)
     river_start_x = 300
     river_end_x   = 500
     river_start_y = 0
@@ -25,15 +22,12 @@ def build_world():
     dem[river_start_y:river_end_y, river_start_x:river_end_x] = 0
     terrain[river_start_y:river_end_y, river_start_x:river_end_x] = 'water'
 
-    # Plateau: x=0..999, y=800..999 => dem=100
     plateau_start_y = 800
     plateau_end_y   = 1000
     plateau_start_x = 0
     plateau_end_x   = 1000
     dem[plateau_start_y:plateau_end_y, plateau_start_x:plateau_end_x] = 100
 
-    # Sloped Terrain: x=600..799, y=0..799 
-    # Gradually goes from 0m up to ~100m
     slope_start_x = 600
     slope_end_x   = 800
     slope_start_y = 0
@@ -42,7 +36,6 @@ def build_world():
         slope_height = ((col - slope_start_x + 1) / (slope_end_x - slope_start_x)) * 100
         dem[slope_start_y:slope_end_y, col] = slope_height
 
-    # Flatten the area x=800..999 using the last slope's height
     flat_start_x = 800
     flat_end_x   = 1000
     last_slope_height = dem[:, slope_end_x - 1].copy()
@@ -50,8 +43,8 @@ def build_world():
 
     return dem, terrain
 
+
 def visualize_world_and_path(dem, terrain, rrt_star, path=None):
-    # 1 meter resolution -> shape is 1000 x 1000
     size = dem.shape[0]
     x = np.arange(size)
     y = np.arange(size)
@@ -102,12 +95,12 @@ def visualize_world_and_path(dem, terrain, rrt_star, path=None):
     ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_zlabel('Elevation (m)')
-    ax.set_title('World + RRT* Path (1m Resolution)')
+    ax.set_title('World + RRT* Path (Check if Node/Path is above ground)')
     ax.view_init(elev=45, azim=-110)
     plt.show()
 
 ###############################################################################
-# RRT* Implementation (Ignoring DEM for Path Feasibility)
+# RRT* Implementation with Ground Checks
 ###############################################################################
 
 def calculate_distance(node1, node2):
@@ -134,28 +127,41 @@ class Node:
         self.cost = 0.0
 
 class RRTStar:
-    def __init__(self, start, goal, rand_area, expand_dis=1.0):
+    def __init__(self, start, goal, rand_area, expand_dis, dem):
         self.MAX_ITER = 5000
         self.CONNECT_RADIUS = 2.0
         self.start = Node(*start)
-        self.end = Node(*goal)
+        self.end   = Node(*goal)
         self.min_rand = rand_area[0]
         self.max_rand = rand_area[1]
         self.expand_dis = expand_dis
         self.node_list = [self.start]
+        self.dem = dem
 
     def planning(self):
         for _ in range(self.MAX_ITER):
             rnd_node = self.get_random_node()
+            # If the random node itself is infeasible, skip
+            if not self.is_feasible_node(rnd_node):
+                continue
+
             nearest_node = self.get_nearest_node(rnd_node)
             new_node = self.steer(nearest_node, rnd_node, self.expand_dis)
+
+            # If new_node is below ground or out of map => infeasible
+            if not self.is_feasible_node(new_node):
+                continue
+
+            # Check if the path from nearest_node -> new_node is collision-free (above ground)
             if self.is_feasible_path(nearest_node, new_node):
                 near_nodes = self.find_near_nodes(new_node)
                 new_node = self.choose_parent(new_node, nearest_node, near_nodes)
                 self.node_list.append(new_node)
                 self.rewire(new_node, near_nodes)
+
             if self.reached_goal(new_node):
                 return self.generate_final_course(new_node)
+
         return None
 
     def get_random_node(self):
@@ -182,7 +188,36 @@ class RRTStar:
         new_node.cost = from_node.cost + calculate_cost(from_node, new_node)
         return new_node
 
+    def is_feasible_node(self, node):
+        # Round or floor to nearest integer indices to access dem
+        ix = int(round(node.x))
+        iy = int(round(node.y))
+
+        # Check boundary
+        if ix < 0 or iy < 0 or ix >= self.dem.shape[1] or iy >= self.dem.shape[0]:
+            return False
+
+        ground_height = self.dem[iy, ix]
+        if node.z < ground_height:
+            return False
+        return True
+
     def is_feasible_path(self, node1, node2):
+        # Sample along the line in small steps to ensure above ground
+        steps = 10
+        for i in range(1, steps + 1):
+            t = i / steps
+            x = node1.x + t * (node2.x - node1.x)
+            y = node1.y + t * (node2.y - node1.y)
+            z = node1.z + t * (node2.z - node1.z)
+
+            ix = int(round(x))
+            iy = int(round(y))
+            if ix < 0 or iy < 0 or ix >= self.dem.shape[1] or iy >= self.dem.shape[0]:
+                return False
+            ground_height = self.dem[iy, ix]
+            if z < ground_height:
+                return False
         return True
 
     def find_near_nodes(self, new_node):
@@ -205,6 +240,7 @@ class RRTStar:
 
     def rewire(self, new_node, near_nodes):
         for near_node in near_nodes:
+            # Check feasibility again in case of new edge
             if self.is_feasible_path(new_node, near_node):
                 new_cost = new_node.cost + calculate_cost(new_node, near_node)
                 if new_cost < near_node.cost:
@@ -216,10 +252,10 @@ class RRTStar:
 
     def generate_final_course(self, last_node):
         path = [[self.end.x, self.end.y, self.end.z]]
-        node = last_node
-        while node is not None:
-            path.append([node.x, node.y, node.z])
-            node = node.parent
+        n = last_node
+        while n is not None:
+            path.append([n.x, n.y, n.z])
+            n = n.parent
         path.reverse()
         return path
 
@@ -230,20 +266,21 @@ class RRTStar:
 def main():
     dem, terrain = build_world()
 
-    # We'll place the goal at the "top-right" corner: [999, 999, dem height]
-    # This ensures the goal sits on the terrain surface there.
     size = dem.shape[0] - 1
-    end_height = dem[size, size]
-    start = [0, 0, dem[0, 0]]     # Start at (0,0), with terrain height
+    end_height   = dem[size, size]
+    start_height = dem[0, 0]
+
+    # Start at top-left corner, on ground
+    start = [0, 0, start_height]
+    # Goal at bottom-right corner, on ground
     goal  = [size, size, end_height]
 
-    print("Start RRT* path planning in 3D (1m resolution)")
-
-    # We allow sampling in [ -50.. (size+50) ] for x, y, z
-    # This expands the random region a bit around the map
+    # We allow random sampling from -50.. (size+50) for x,y,z
     rand_area = [-50, size + 50]
 
-    rrt_star = RRTStar(start, goal, rand_area, expand_dis=20.0)
+    print("Start RRT* path planning in 3D, ensuring each node/edge is above ground")
+
+    rrt_star = RRTStar(start, goal, rand_area, expand_dis=20.0, dem=dem)
 
     start_time = time.perf_counter()
     path = rrt_star.planning()
