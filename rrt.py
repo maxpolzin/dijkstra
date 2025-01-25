@@ -43,7 +43,6 @@ def build_world():
 
     return dem, terrain
 
-
 def visualize_world_and_path(dem, terrain, rrt_star, path=None):
     size = dem.shape[0]
     x = np.arange(size)
@@ -57,33 +56,40 @@ def visualize_world_and_path(dem, terrain, rrt_star, path=None):
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
 
-    ax.plot_surface(X, Y, dem,
-                    facecolors=terrain_colors,
-                    linewidth=0.5,
-                    edgecolor='gray',
-                    antialiased=False,
-                    shade=False)
+    # Set partial transparency on the terrain so path is always visible
+    surf = ax.plot_surface(
+        X, Y, dem,
+        facecolors=terrain_colors,
+        linewidth=0.5,
+        edgecolor='gray',
+        antialiased=False,
+        shade=False,
+        alpha=0.6  # <--- Transparency so we can see objects under surface
+    )
 
+    # Plot edges of the RRT* tree
     for node in rrt_star.node_list:
         if node.parent:
-            ax.plot(
-                [node.x, node.parent.x],
-                [node.y, node.parent.y],
-                [node.z, node.parent.z],
-                color="blue", linewidth=0.5
-            )
+            xs = [node.x, node.parent.x]
+            ys = [node.y, node.parent.y]
+            zs = [node.z, node.parent.z]
+            ax.plot(xs, ys, zs, color="blue", linewidth=0.5, zorder=5)
 
+    # Plot the path in red with higher zorder
     if path:
-        path = np.array(path)
-        ax.plot(path[:, 0],
-                path[:, 1],
-                path[:, 2],
-                color="red", linewidth=2)
+        path_arr = np.array(path)
+        ax.plot(path_arr[:, 0],
+                path_arr[:, 1],
+                path_arr[:, 2],
+                color="red",
+                linewidth=2,
+                zorder=10)
 
+    # Mark start and goal
     ax.scatter(rrt_star.start.x, rrt_star.start.y, rrt_star.start.z,
-               color="green", s=100, label="Start")
+               color="green", s=100, label="Start", zorder=20)
     ax.scatter(rrt_star.end.x, rrt_star.end.y, rrt_star.end.z,
-               color="magenta", s=100, label="Goal")
+               color="magenta", s=100, label="Goal", zorder=20)
 
     from matplotlib.patches import Patch
     legend_elements = [
@@ -95,9 +101,15 @@ def visualize_world_and_path(dem, terrain, rrt_star, path=None):
     ax.set_xlabel('X (m)')
     ax.set_ylabel('Y (m)')
     ax.set_zlabel('Elevation (m)')
-    ax.set_title('World + RRT* Path (Check if Node/Path is above ground)')
+    ax.set_title('World + RRT* Path (Surface Partially Transparent)')
     ax.view_init(elev=45, azim=-110)
+
+    # Optionally adjust how Matplotlib orders 3D elements
+    # ax.set_proj_type('ortho')        # Orthographic projection
+    # ax.set_zsort('min')             # or 'max' or 'none'
+
     plt.show()
+
 
 ###############################################################################
 # RRT* Implementation with Ground Checks
@@ -169,7 +181,7 @@ class RRTStar:
         if random.randint(0, 100) > GOAL_SAMPLE_RATE:
             x = random.uniform(self.min_rand, self.max_rand)
             y = random.uniform(self.min_rand, self.max_rand)
-            z = random.uniform(self.min_rand, self.max_rand)
+            z = random.uniform(self.min_rand, self.max_rand)/8
             return Node(x, y, z)
         else:
             return Node(self.end.x, self.end.y, self.end.z)
