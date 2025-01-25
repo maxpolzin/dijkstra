@@ -292,7 +292,7 @@ def main():
 
     print("Start RRT* path planning in 3D, ensuring each node/edge is above ground")
 
-    rrt_star = RRTStar(start, goal, rand_area, expand_dis=20.0, dem=dem)
+    rrt_star = RRTStar(start, goal, rand_area, expand_dis=5.0, dem=dem)
 
     start_time = time.perf_counter()
     path = rrt_star.planning()
