@@ -24,6 +24,8 @@ from matplotlib.patches import Patch
 MAX_ITER = 5000           # Maximum iterations for RRT*
 
 GOAL_SAMPLE_RATE = 0.02   # Probability of directly sampling the goal
+GROUND_NODE_SAMPLE_RATE = 0.2 # Probability of sampling a ground node
+
 EXPAND_DIS = 10.0         # Extension distance in steer
 CONNECT_RADIUS = 100.0    # Radius used in find_near_nodes
 
@@ -64,16 +66,16 @@ def calculate_cost(from_node, to_node):
     return calculate_distance(from_node, to_node)
 
 class Node:
-    def __init__(self, x, y, z):
+    def __init__(self, x, y, z, is_ground_node=True):
         self.x = x
         self.y = y
         self.z = z
         self.parent = None
         self.cost = 0.0
+        self.is_ground_node = is_ground_node
 
 class RRTStar:
     def __init__(self, dem, terrain):
-        # Use global constants
         self.start = Node(*START)
         self.end   = Node(*GOAL)
         self.node_list = [self.start]
@@ -99,12 +101,20 @@ class RRTStar:
 
     def get_random_node(self):
         if random.random() <= GOAL_SAMPLE_RATE:
-            return Node(self.end.x, self.end.y, self.end.z)
+            return Node(self.end.x, self.end.y, self.end.z, self.end.is_ground_node)
         else:
-            x = random.uniform(RAND_MIN_XY, RAND_MAX_XY)
-            y = random.uniform(RAND_MIN_XY, RAND_MAX_XY)
-            z = random.uniform(RAND_MIN_Z, RAND_MAX_Z)
-            return Node(x, y, z)
+            if random.random() <= GROUND_NODE_SAMPLE_RATE:
+                is_ground_node = True
+                x = random.uniform(RAND_MIN_XY, RAND_MAX_XY)
+                y = random.uniform(RAND_MIN_XY, RAND_MAX_XY)
+                z = self.get_elevation(x, y)
+            else:
+                is_ground_node = False
+                x = random.uniform(RAND_MIN_XY, RAND_MAX_XY)
+                y = random.uniform(RAND_MIN_XY, RAND_MAX_XY)
+                z = random.uniform(RAND_MIN_Z, RAND_MAX_Z)
+
+            return Node(x, y, z, is_ground_node)
 
     def get_elevation(self, x, y):
         size_x = self.dem.shape[1]
@@ -126,7 +136,10 @@ class RRTStar:
         if d > 0:
             new_node.x += dist * math.cos(theta) * math.sin(phi)
             new_node.y += dist * math.sin(theta) * math.sin(phi)
-            new_node.z += dist * math.cos(phi)
+            if to_node.is_ground_node:
+                new_node.z = self.get_elevation(new_node.x, new_node.y)
+            else:
+                new_node.z += dist * math.cos(phi)
         new_node.parent = from_node
         new_node.cost = from_node.cost + calculate_cost(from_node, new_node)
         return new_node
