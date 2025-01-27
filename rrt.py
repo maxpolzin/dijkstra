@@ -23,9 +23,9 @@ from matplotlib.patches import Patch
 ###############################################################################
 MAX_ITER = 5000           # Maximum iterations for RRT*
 
-GOAL_SAMPLE_RATE = 0.01    # Probability of directly sampling the goal
-EXPAND_DIS = 20.0          # Extension distance in steer
-CONNECT_RADIUS = 200.0     # Radius used in find_near_nodes
+GOAL_SAMPLE_RATE = 0.02   # Probability of directly sampling the goal
+EXPAND_DIS = 10.0         # Extension distance in steer
+CONNECT_RADIUS = 100.0    # Radius used in find_near_nodes
 
 # Start and goal in (x, y, z)
 SIZE = 1000               # Dimensions for DEM creation
@@ -33,7 +33,7 @@ RAND_MIN_XY = -50
 RAND_MAX_XY = SIZE + 50
 
 RAND_MIN_Z = 0
-RAND_MAX_Z = 200
+RAND_MAX_Z = 150
 
 
 START = (0, 0, 0)
@@ -136,6 +136,10 @@ class RRTStar:
         Placeholder feasibility check (always returns True).
         You could check for collisions, terrain constraints, etc.
         """
+        if node1.z < self.get_elevation(node1.x, node1.y) or node2.z < self.get_elevation(node2.x, node2.y):
+            return False
+
+
         return True
 
     def find_near_nodes(self, new_node):
@@ -268,7 +272,7 @@ def visualize_world_and_path(dem, terrain, rrt_star, path=None):
     ax.set_ylabel('Y (m)')
     ax.set_zlabel('Elevation (m)')
     ax.set_title('3D RRT* Path on DEM')
-    ax.view_init(elev=45, azim=-90)
+    ax.view_init(elev=15, azim=-110)
     plt.show()
 
 ###############################################################################
