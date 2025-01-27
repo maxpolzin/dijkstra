@@ -10,8 +10,8 @@ import heapq
 import networkx as nx
 import random
 
-from scenario import build_world_graph
-from visualize import visualize_world_with_multiline
+from dijkstra_scenario import build_world_graph
+from dijkstra_visualize import visualize_world_with_multiline
 
 
 G_world=build_world_graph(id=None)

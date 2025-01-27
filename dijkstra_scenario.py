@@ -7,7 +7,7 @@
 import networkx as nx
 import random
 
-from visualize import visualize_world_with_multiline
+from dijkstra_visualize import visualize_world_with_multiline
 
 
 def determine_edge_attributes(u, v, G, terrain_specs):
