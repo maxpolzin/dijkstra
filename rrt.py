@@ -139,7 +139,6 @@ class RRTStar:
         if node1.z < self.get_elevation(node1.x, node1.y) or node2.z < self.get_elevation(node2.x, node2.y):
             return False
 
-
         return True
 
     def find_near_nodes(self, new_node):
