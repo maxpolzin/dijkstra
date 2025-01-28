@@ -27,7 +27,7 @@ GOAL_SAMPLE_RATE = 0.02   # Probability of directly sampling the goal
 GROUND_NODE_SAMPLE_RATE = 0.7 # Probability of sampling a ground node
 
 EXPAND_DIS = 10.0         # Extension distance in steer
-CONNECT_RADIUS = 80.0    # Radius used in find_near_nodes
+CONNECT_RADIUS = 100.0    # Radius used in find_near_nodes
 
 MAX_DRIVING_SLOPE = 0.8
 
@@ -169,9 +169,6 @@ class RRTStar:
         # if node1.z < 1 and self.get_terrain_type(node1.x, node1.y) == "water" or node2.z < 1 and self.get_terrain_type(node2.x, node2.y) == "water":
         #     return False
            
-        # if abs(node1.z - node2.z) > 20 and node1.is_ground_node and node2.is_ground_node:
-        #     return False
-
         if node1.is_ground_node and node2.is_ground_node and self.get_slope(node1, node2) > MAX_DRIVING_SLOPE:
                 return False
         
