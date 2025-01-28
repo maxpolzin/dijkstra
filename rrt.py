@@ -40,6 +40,7 @@ RAND_MIN_Z = 0
 RAND_MAX_Z = 150
 
 
+# START = (0, 900, 100)
 START = (0, 0, 0)
 GOAL  = (1000, 100, 0)
 
