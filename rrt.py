@@ -27,7 +27,7 @@ GOAL_SAMPLE_RATE = 0.02   # Probability of directly sampling the goal
 GROUND_NODE_SAMPLE_RATE = 0.7 # Probability of sampling a ground node
 
 EXPAND_DIS = 10.0         # Extension distance in steer
-CONNECT_RADIUS = 100.0    # Radius used in find_near_nodes
+CONNECT_RADIUS = 200.0    # Radius used in find_near_nodes
 
 MAX_DRIVING_SLOPE = 0.8
 
@@ -43,6 +43,21 @@ RAND_MAX_Z = 150
 # START = (0, 900, 100)
 START = (0, 0, 0)
 GOAL  = (1000, 100, 0)
+
+
+MODES = {
+    'fly':   {'speed': 5.0,  'power': 1000.0},  # m/s, W
+    'swim':  {'speed': 0.5,  'power':   10.0}, # Try 0.15 vs 0.16
+    'roll':  {'speed': 3.0,  'power':    1.0},
+    'drive': {'speed': 1.0,  'power':   30.0},
+}
+
+CONSTANTS = {
+    'SWITCH_TIME': 100.0,  # s time penalty for mode switch
+    'SWITCH_ENERGY': 1.0,  # Wh penalty for switching
+    'BATTERY_CAPACITY': 15,  # Wh
+    'RECHARGE_TIME': 1000.0,  # s
+}
 
 
 ###############################################################################
@@ -68,8 +83,9 @@ def calculate_distance_and_angle(node1, node2):
 def calculate_cost(from_node, to_node):
     return calculate_distance(from_node, to_node)
 
+
 class Node:
-    def __init__(self, x, y, z, is_ground_node=True):
+    def __init__(self, x, y, z, is_ground_node):
         self.x = x
         self.y = y
         self.z = z
@@ -77,10 +93,11 @@ class Node:
         self.cost = 0.0
         self.is_ground_node = is_ground_node
 
+
 class RRTStar:
     def __init__(self, dem, terrain):
-        self.start = Node(*START)
-        self.end   = Node(*GOAL)
+        self.start = Node(*START, None)
+        self.end   = Node(*GOAL, None)
         self.node_list = [self.start]
         self.dem = dem
         self.terrain = terrain
@@ -104,10 +121,7 @@ class RRTStar:
 
     def get_random_node(self):
         if random.random() <= GOAL_SAMPLE_RATE:
-            if random.random() <= GROUND_NODE_SAMPLE_RATE:        
-                return Node(self.end.x, self.end.y, self.end.z, True)
-            else:
-                return Node(self.end.x, self.end.y, self.end.z, False)
+            return self.end
 
         else:
             if random.random() <= GROUND_NODE_SAMPLE_RATE:
@@ -144,13 +158,84 @@ class RRTStar:
     def get_slope(self, node1, node2):
         return abs(node2.z - node1.z) / calculate_distance(node1, node2)
 
+    def get_mode(self, node):
+        if not node.is_ground_node:
+            return "fly"
+        else:
+            terrain_type = self.get_terrain_type(node.x, node.y)
+            if terrain_type == 'water':
+                return 'swim'
+            else:
+                return 'drive'
+
+
+    def get_travel_time_and_energy(self, dist, mode):
+        speed = MODES[mode]["speed"]  # m/s
+        power = MODES[mode]["power"]  # W
+
+        travel_time = dist / speed       # [s]
+        # Convert power in W and time in s into Wh:
+        travel_energy = (power * travel_time) / 3600.0  # [Wh]
+
+        return travel_time, travel_energy
+
+
+
+    def calculate_time_cost(self, node1, node2):
+        dist = calculate_distance(node1, node2)
+
+        mode1 = self.get_mode(node1)
+        mode2 = self.get_mode(node2)
+
+        if mode1 == mode2:
+            travel_time, travel_energy = self.get_travel_time_and_energy(dist, mode1)
+            switch_time = 0.0
+            switch_energy = 0.0
+
+        else:
+
+            if (mode1 in ["drive", "swim"]) and (mode2 in ["drive", "swim"]):
+                half_dist = dist / 2.0
+                t1, e1 = self.get_travel_time_and_energy(half_dist, mode1)
+                t2, e2 = self.get_travel_time_and_energy(half_dist, mode2)
+                travel_time = t1 + t2
+                travel_energy = e1 + e2
+                switch_time = 0.0
+                switch_energy = 0.0
+
+            elif (mode1 in ["drive", "swim"] and mode2 == "fly") or \
+                (mode2 in ["drive", "swim"] and mode1 == "fly"):
+
+                travel_time, travel_energy = self.get_travel_time_and_energy(dist, "fly")
+                switch_time = CONSTANTS["SWITCH_TIME"]       # e.g. 100 s
+                switch_energy = CONSTANTS["SWITCH_ENERGY"]   # e.g. 1 Wh
+            else:
+                # Catch-all for anything else (shouldn't happen in our logic):
+                travel_time = 0.0
+                travel_energy = 0.0
+                switch_time = 0.0
+                switch_energy = 0.0
+                print("Error: Unknown mode combination")
+
+        total_time = travel_time + switch_time
+        total_energy = travel_energy + switch_energy
+
+        if total_energy > CONSTANTS["BATTERY_CAPACITY"]:
+            total_time += CONSTANTS["RECHARGE_TIME"]  # e.g. 1000 s
+
+        return total_time
+
+
+
+
+
     def get_nearest_node(self, rnd_node):
         return min(self.node_list, key=lambda node: calculate_distance(node, rnd_node))
 
     def steer(self, from_node, to_node):
         d, theta, phi = calculate_distance_and_angle(from_node, to_node)
         dist = min(EXPAND_DIS, d)
-        new_node = Node(from_node.x, from_node.y, from_node.z)
+        new_node = Node(from_node.x, from_node.y, from_node.z, True) # TODO Why does it work for True???
         if d > 0:
             new_node.x += dist * math.cos(theta) * math.sin(phi)
             new_node.y += dist * math.sin(theta) * math.sin(phi)
@@ -159,7 +244,7 @@ class RRTStar:
             else:
                 new_node.z += dist * math.cos(phi)
         new_node.parent = from_node
-        new_node.cost = from_node.cost + calculate_cost(from_node, new_node)
+        new_node.cost = from_node.cost + self.calculate_time_cost(from_node, new_node)
         return new_node
 
     def is_feasible_path(self, node1, node2):
@@ -182,11 +267,11 @@ class RRTStar:
         return [node for node in self.node_list if calculate_distance(node, new_node) <= r]
 
     def choose_parent(self, new_node, nearest_node, near_nodes):
-        min_cost = nearest_node.cost + calculate_cost(nearest_node, new_node)
+        min_cost = nearest_node.cost + self.calculate_time_cost(nearest_node, new_node)
         best_node = nearest_node
         for near_node in near_nodes:
             if self.is_feasible_path(near_node, new_node):
-                cost = near_node.cost + calculate_cost(near_node, new_node)
+                cost = near_node.cost + self.calculate_time_cost(near_node, new_node)
                 if cost < min_cost:
                     min_cost = cost
                     best_node = near_node
@@ -197,7 +282,7 @@ class RRTStar:
     def rewire(self, new_node, near_nodes):
         for near_node in near_nodes:
             if self.is_feasible_path(new_node, near_node):
-                new_cost = new_node.cost + calculate_cost(new_node, near_node)
+                new_cost = new_node.cost + self.calculate_time_cost(new_node, near_node)
                 if new_cost < near_node.cost:
                     near_node.parent = new_node
                     near_node.cost = new_cost
