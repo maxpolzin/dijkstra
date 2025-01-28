@@ -29,6 +29,8 @@ GROUND_NODE_SAMPLE_RATE = 0.7 # Probability of sampling a ground node
 EXPAND_DIS = 10.0         # Extension distance in steer
 CONNECT_RADIUS = 80.0    # Radius used in find_near_nodes
 
+MAX_DRIVING_SLOPE = 0.8
+
 # Start and goal in (x, y, z)
 SIZE = 1000               # Dimensions for DEM creation
 RAND_MIN_XY = -50
@@ -39,7 +41,7 @@ RAND_MAX_Z = 150
 
 
 START = (0, 0, 0)
-GOAL  = (1000, 800, 0)
+GOAL  = (1000, 100, 0)
 
 
 ###############################################################################
@@ -138,6 +140,8 @@ class RRTStar:
 
         return self.terrain[y_clamped][x_clamped]
 
+    def get_slope(self, node1, node2):
+        return abs(node2.z - node1.z) / calculate_distance(node1, node2)
 
     def get_nearest_node(self, rnd_node):
         return min(self.node_list, key=lambda node: calculate_distance(node, rnd_node))
@@ -165,8 +169,12 @@ class RRTStar:
         # if node1.z < 1 and self.get_terrain_type(node1.x, node1.y) == "water" or node2.z < 1 and self.get_terrain_type(node2.x, node2.y) == "water":
         #     return False
            
-        if abs(node1.z - node2.z) > 10 and node1.is_ground_node and node2.is_ground_node:
-            return False
+        # if abs(node1.z - node2.z) > 20 and node1.is_ground_node and node2.is_ground_node:
+        #     return False
+
+        if node1.is_ground_node and node2.is_ground_node and self.get_slope(node1, node2) > MAX_DRIVING_SLOPE:
+                return False
+        
 
         return True
 
@@ -326,3 +334,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# %%
