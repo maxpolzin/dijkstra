@@ -23,13 +23,13 @@ from matplotlib.patches import Patch
 ###############################################################################
 MAX_ITER = 5000           # Maximum iterations for RRT*
 
-GOAL_SAMPLE_RATE = 0.02   # Probability of directly sampling the goal
-GROUND_NODE_SAMPLE_RATE = 0.7 # Probability of sampling a ground node
+GOAL_SAMPLE_RATE = 0.1   # Probability of directly sampling the goal
+GROUND_NODE_SAMPLE_RATE = 0.9 # Probability of sampling a ground node
 
 EXPAND_DIS = 10.0         # Extension distance in steer
-CONNECT_RADIUS = 200.0    # Radius used in find_near_nodes
+CONNECT_RADIUS = 800.0    # Radius used in find_near_nodes
 
-MAX_DRIVING_SLOPE = 0.8
+MAX_DRIVING_SLOPE = 0.35
 
 # Start and goal in (x, y, z)
 SIZE = 1000               # Dimensions for DEM creation
@@ -85,19 +85,18 @@ def calculate_cost(from_node, to_node):
 
 
 class Node:
-    def __init__(self, x, y, z, is_ground_node):
+    def __init__(self, x, y, z):
         self.x = x
         self.y = y
         self.z = z
         self.parent = None
         self.cost = 0.0
-        self.is_ground_node = is_ground_node
 
 
 class RRTStar:
     def __init__(self, dem, terrain):
-        self.start = Node(*START, None)
-        self.end   = Node(*GOAL, None)
+        self.start = Node(*START)
+        self.end   = Node(*GOAL)
         self.node_list = [self.start]
         self.dem = dem
         self.terrain = terrain
@@ -122,52 +121,63 @@ class RRTStar:
     def get_random_node(self):
         if random.random() <= GOAL_SAMPLE_RATE:
             return self.end
-
         else:
             if random.random() <= GROUND_NODE_SAMPLE_RATE:
-                is_ground_node = True
                 x = random.uniform(RAND_MIN_XY, RAND_MAX_XY)
                 y = random.uniform(RAND_MIN_XY, RAND_MAX_XY)
-                z = self.get_elevation(x, y)
+                z = 0.0
             else:
-                is_ground_node = False
                 x = random.uniform(RAND_MIN_XY, RAND_MAX_XY)
                 y = random.uniform(RAND_MIN_XY, RAND_MAX_XY)
-                z = random.uniform(RAND_MIN_Z, RAND_MAX_Z)
+                z = self.get_elevation(x, y) + random.uniform(RAND_MIN_Z, RAND_MAX_Z)
 
-            return Node(x, y, z, is_ground_node)
+            return Node(x, y, z)
 
-    def get_elevation(self, x, y):
-        size_x = self.dem.shape[1]
-        size_y = self.dem.shape[0]
 
-        x_clamped = max(0, min(size_x - 1, int(round(x))))
-        y_clamped = max(0, min(size_y - 1, int(round(y))))
 
-        return self.dem[y_clamped][x_clamped]
+    def steer(self, from_node, to_node):
+        d, theta, phi = calculate_distance_and_angle(from_node, to_node)
+        dist = min(EXPAND_DIS, d)
 
-    def get_terrain_type(self, x, y):
-        size_x = self.terrain.shape[1]
-        size_y = self.terrain.shape[0]
+        new_node = Node(from_node.x, from_node.y, from_node.z)
 
-        x_clamped = max(0, min(size_x - 1, int(round(x))))
-        y_clamped = max(0, min(size_y - 1, int(round(y))))
+        new_node.x += dist * math.cos(theta) * math.sin(phi)
+        new_node.y += dist * math.sin(theta) * math.sin(phi)
+        new_node.z += dist * math.cos(phi)
 
-        return self.terrain[y_clamped][x_clamped]
+        if new_node.z < self.get_elevation(new_node.x, new_node.y):
+            new_node.z = self.get_elevation(new_node.x, new_node.y)
 
-    def get_slope(self, node1, node2):
-        return abs(node2.z - node1.z) / calculate_distance(node1, node2)
+        new_node.parent = from_node
+        new_node.cost = from_node.cost + self.calculate_time_cost(from_node, new_node)
+        return new_node
+
+
+
+    def is_feasible_path(self, from_node, to_node):
+        if from_node.z < self.get_elevation(from_node.x, from_node.y) or to_node.z < self.get_elevation(to_node.x, to_node.y):
+            return False
+
+        # Uncomment this to jump over water
+        # if from_node.z < 1 and self.get_terrain_type(from_node.x, from_node.y) == "water" or to_node.z < 1 and self.get_terrain_type(to_node.x, to_node.y) == "water":
+        #     return False
+              
+        return True
+
+
+
+    def get_slope(self, from_node, to_node):
+        return (to_node.z - from_node.z) / calculate_distance(from_node, to_node)
+
 
     def get_mode(self, node):
-        if not node.is_ground_node:
-            return "fly"
+        if node.z > self.get_elevation(node.x, node.y):
+            return "fly"       
+        elif self.get_terrain_type(node.x, node.y) == 'water':
+            return 'swim'
         else:
-            terrain_type = self.get_terrain_type(node.x, node.y)
-            if terrain_type == 'water':
-                return 'swim'
-            else:
-                return 'drive'
-
+            return 'drive'
+    
 
     def get_travel_time_and_energy(self, dist, mode):
         speed = MODES[mode]["speed"]  # m/s
@@ -178,8 +188,6 @@ class RRTStar:
         travel_energy = (power * travel_time) / 3600.0  # [Wh]
 
         return travel_time, travel_energy
-
-
 
     def calculate_time_cost(self, node1, node2):
         dist = calculate_distance(node1, node2)
@@ -227,45 +235,14 @@ class RRTStar:
 
 
 
-
-
     def get_nearest_node(self, rnd_node):
         return min(self.node_list, key=lambda node: calculate_distance(node, rnd_node))
-
-    def steer(self, from_node, to_node):
-        d, theta, phi = calculate_distance_and_angle(from_node, to_node)
-        dist = min(EXPAND_DIS, d)
-        new_node = Node(from_node.x, from_node.y, from_node.z, True) # TODO Why does it work for True???
-        if d > 0:
-            new_node.x += dist * math.cos(theta) * math.sin(phi)
-            new_node.y += dist * math.sin(theta) * math.sin(phi)
-            if to_node.is_ground_node:
-                new_node.z = self.get_elevation(new_node.x, new_node.y)
-            else:
-                new_node.z += dist * math.cos(phi)
-        new_node.parent = from_node
-        new_node.cost = from_node.cost + self.calculate_time_cost(from_node, new_node)
-        return new_node
-
-    def is_feasible_path(self, node1, node2):
-        if node1.z < self.get_elevation(node1.x, node1.y) or node2.z < self.get_elevation(node2.x, node2.y):
-            return False
-
-        # Uncomment this to jump over water
-        # if node1.z < 1 and self.get_terrain_type(node1.x, node1.y) == "water" or node2.z < 1 and self.get_terrain_type(node2.x, node2.y) == "water":
-        #     return False
-           
-        if node1.is_ground_node and node2.is_ground_node and self.get_slope(node1, node2) > MAX_DRIVING_SLOPE:
-                return False
-        
-
-        return True
 
     def find_near_nodes(self, new_node):
         n_nodes = len(self.node_list) + 1
         r = CONNECT_RADIUS * (math.log(n_nodes) / n_nodes)**(1.0 / 3.0)
         return [node for node in self.node_list if calculate_distance(node, new_node) <= r]
-
+ 
     def choose_parent(self, new_node, nearest_node, near_nodes):
         min_cost = nearest_node.cost + self.calculate_time_cost(nearest_node, new_node)
         best_node = nearest_node
@@ -298,6 +275,21 @@ class RRTStar:
             n = n.parent
         path.reverse()
         return path
+
+    def get_elevation(self, x, y):
+        size_x = self.dem.shape[1]
+        size_y = self.dem.shape[0]
+        x_clamped = max(0, min(size_x - 1, int(round(x))))
+        y_clamped = max(0, min(size_y - 1, int(round(y))))
+        return self.dem[y_clamped][x_clamped]
+
+    def get_terrain_type(self, x, y):
+        size_x = self.terrain.shape[1]
+        size_y = self.terrain.shape[0]
+        x_clamped = max(0, min(size_x - 1, int(round(x))))
+        y_clamped = max(0, min(size_y - 1, int(round(y))))
+        return self.terrain[y_clamped][x_clamped]
+
 
 ###############################################################################
 # 4) World-Building Function
