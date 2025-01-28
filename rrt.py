@@ -24,7 +24,7 @@ from matplotlib.patches import Patch
 MAX_ITER = 5000           # Maximum iterations for RRT*
 
 GOAL_SAMPLE_RATE = 0.02   # Probability of directly sampling the goal
-GROUND_NODE_SAMPLE_RATE = 0.2 # Probability of sampling a ground node
+GROUND_NODE_SAMPLE_RATE = 0.8 # Probability of sampling a ground node
 
 EXPAND_DIS = 10.0         # Extension distance in steer
 CONNECT_RADIUS = 100.0    # Radius used in find_near_nodes
@@ -39,7 +39,7 @@ RAND_MAX_Z = 150
 
 
 START = (0, 0, 0)
-GOAL  = (1000, 200, 0)
+GOAL  = (1000, 800, 0)
 
 
 ###############################################################################
@@ -120,11 +120,20 @@ class RRTStar:
         size_x = self.dem.shape[1]
         size_y = self.dem.shape[0]
 
-        # Clamp coordinates to DEM range
         x_clamped = max(0, min(size_x - 1, int(round(x))))
         y_clamped = max(0, min(size_y - 1, int(round(y))))
 
         return self.dem[y_clamped][x_clamped]
+
+    def get_terrain_type(self, x, y):
+        size_x = self.terrain.shape[1]
+        size_y = self.terrain.shape[0]
+
+        x_clamped = max(0, min(size_x - 1, int(round(x))))
+        y_clamped = max(0, min(size_y - 1, int(round(y))))
+
+        return self.terrain[y_clamped][x_clamped]
+
 
     def get_nearest_node(self, rnd_node):
         return min(self.node_list, key=lambda node: calculate_distance(node, rnd_node))
@@ -145,13 +154,13 @@ class RRTStar:
         return new_node
 
     def is_feasible_path(self, node1, node2):
-        """
-        Placeholder feasibility check (always returns True).
-        You could check for collisions, terrain constraints, etc.
-        """
         if node1.z < self.get_elevation(node1.x, node1.y) or node2.z < self.get_elevation(node2.x, node2.y):
             return False
 
+        # Uncomment this to jump over water
+        # if node1.z < 1 and self.get_terrain_type(node1.x, node1.y) == "water" or node2.z < 1 and self.get_terrain_type(node2.x, node2.y) == "water":
+        #     return False
+           
         return True
 
     def find_near_nodes(self, new_node):
