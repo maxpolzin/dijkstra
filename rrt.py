@@ -24,10 +24,10 @@ from matplotlib.patches import Patch
 MAX_ITER = 5000           # Maximum iterations for RRT*
 
 GOAL_SAMPLE_RATE = 0.02   # Probability of directly sampling the goal
-GROUND_NODE_SAMPLE_RATE = 0.8 # Probability of sampling a ground node
+GROUND_NODE_SAMPLE_RATE = 0.7 # Probability of sampling a ground node
 
 EXPAND_DIS = 10.0         # Extension distance in steer
-CONNECT_RADIUS = 100.0    # Radius used in find_near_nodes
+CONNECT_RADIUS = 80.0    # Radius used in find_near_nodes
 
 # Start and goal in (x, y, z)
 SIZE = 1000               # Dimensions for DEM creation
@@ -101,7 +101,11 @@ class RRTStar:
 
     def get_random_node(self):
         if random.random() <= GOAL_SAMPLE_RATE:
-            return Node(self.end.x, self.end.y, self.end.z, self.end.is_ground_node)
+            if random.random() <= GROUND_NODE_SAMPLE_RATE:        
+                return Node(self.end.x, self.end.y, self.end.z, True)
+            else:
+                return Node(self.end.x, self.end.y, self.end.z, False)
+
         else:
             if random.random() <= GROUND_NODE_SAMPLE_RATE:
                 is_ground_node = True
@@ -161,6 +165,9 @@ class RRTStar:
         # if node1.z < 1 and self.get_terrain_type(node1.x, node1.y) == "water" or node2.z < 1 and self.get_terrain_type(node2.x, node2.y) == "water":
         #     return False
            
+        if abs(node1.z - node2.z) > 10 and node1.is_ground_node and node2.is_ground_node:
+            return False
+
         return True
 
     def find_near_nodes(self, new_node):
