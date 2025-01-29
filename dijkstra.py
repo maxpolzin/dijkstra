@@ -14,7 +14,7 @@ from dijkstra_scenario import build_world_graph
 from dijkstra_visualize import visualize_world_with_multiline
 
 
-G_world=build_world_graph(id=0)
+G_world=build_world_graph(id=None)
 visualize_world_with_multiline(G_world)
 
 
@@ -31,9 +31,9 @@ MODES = {
 
 CONSTANTS = {
     'SWITCH_TIME': 100.0,  # s time penalty for mode switch
-    'SWITCH_ENERGY': 15.0,  # Wh penalty for switching
-    'BATTERY_CAPACITY': 15,  # Wh
-    'RECHARGE_TIME': 1000.0,  # s
+    'SWITCH_ENERGY': 1.0,  # Wh penalty for switching
+    'BATTERY_CAPACITY': 30,  # Wh
+    'RECHARGE_TIME': 3000.0,  # s
 }
 
 def is_edge_allowed(mode, terrain, h1, h2, dist, power):
@@ -340,113 +340,112 @@ visualize_world_with_multiline(G_world, path_states, switch_nodes, recharge_set,
 
 # %%
 
-from itertools import combinations
+from collections import defaultdict
 
-def analyze_paths(L, start, goal):
+def to_string(path):
+    str = ""
+    for i in range(len(path)):
+        node, mode = path[i]
+        if i != 0:
+            prev_node, prev_mode = path[i-1]
+            if prev_node != node:
+                str += f" -> {node}"
+        else:
+            str += f"{node}"
+        str += f"{mode[0].upper()}"
+    return str
 
+
+def find_all_feasible_paths(L, start, goal):
     feasible_paths = []
     for path in nx.all_simple_paths(L, source=start, target=goal):
+        
+        node_visit_counts = defaultdict(int)
+        is_valid = True
+
+        for node, mode in path:
+            node_visit_counts[node] += 1
+            if node_visit_counts[node] > 2:
+                is_valid = False
+                break
+
+        if is_valid:
+            feasible_paths.append(path)
+
+    return feasible_paths
 
 
-
-        paths.append(path)
-        print(path)
-
-
-
-    #find all feasible modes 
- 
-
-
-
-
-
-
-
-
-
-analyze_paths(L, start, goal)
-
-
-
-
-
-
-
-
+paths = find_all_feasible_paths(L, start, goal)
 
 
 # %%
 
+def extract_time_energy(L, path):
+    total_time = 0.0
+    total_energy = 0.0
+
+    for i in range(len(path) - 1):
+        (u_node, u_mode) = path[i]
+        (v_node, v_mode) = path[i + 1]
+
+        if L.has_edge((u_node, u_mode), (v_node, v_mode)):
+            edge_time = L[(u_node, u_mode)][(v_node, v_mode)]['time']
+            edge_energy = L[(u_node, u_mode)][(v_node, v_mode)].get('energy_Wh', 0.0)
+            total_time += edge_time
+            total_energy += edge_energy
+
+    # if more energy than battery capacity is used, include recharge time
+    no_recharges = (total_energy // CONSTANTS['BATTERY_CAPACITY'])
+    total_time +=  no_recharges * CONSTANTS['RECHARGE_TIME']
+
+    return total_time, total_energy, no_recharges
 
 
+times = []
+energies = []
+recharges = []
+
+for path in paths:
+    total_time, total_energy, no_recharges = extract_time_energy(L, path)
+    
+    times.append(total_time)
+    energies.append(total_energy)
+    recharges.append(no_recharges)
+
+    print("Path: ")
+    print(to_string(path))
+    print(f"Total Time: {total_time:.2f}s and Energy: {total_energy:.3f} Wh with {no_recharges} recharges")
+
+print(len(paths))
 
 
-
-
-
-
-
-
-
-# # Now find all solutions with morph-pruning
-# all_paths_prune = find_all_paths_prune_morphs(
-#     L,
-#     start_node=0, 
-#     start_mode='drive',
-#     goal_node=7, 
-#     goal_mode='drive',
-#     battery_capacity=CONSTANTS['BATTERY_CAPACITY'],
-#     recharge_time=CONSTANTS['RECHARGE_TIME'],
-#     dbg=False
-# )
-
-
-# all_paths_prune.sort(key=lambda x: x[1])
-
-# print("\n=== ALL SOLUTIONS (No Layered Loops, Single Switch/Node) ===")
-# for i, (path, total_time, final_used) in enumerate(all_paths_prune, 1):
-#     print(f"Solution #{i}:")
-#     print(f"  Path: {path}")
-#     print(f"  Total Time: {total_time:.2f} s")
-#     print(f"  Final Used Battery: {final_used:.3f} Wh")
-#     print("  --------------------------------")
 
 # # If desired, create histograms
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
-# times = [sol[1] for sol in all_paths_prune]
-# energies = [sol[2] for sol in all_paths_prune]
+plt.figure(figsize=(12,5))
+plt.subplot(1,2,1)
+plt.hist(times, bins=20, color='skyblue', edgecolor='black')
+plt.title("Histogram of Travel Times")
+plt.xlabel("Time [s]")
+plt.ylabel("Count of Solutions")
 
-# plt.figure(figsize=(12,5))
-# plt.subplot(1,2,1)
-# plt.hist(times, bins=20, color='skyblue', edgecolor='black')
-# plt.title("Histogram of Travel Times (No Loops, Single Switch/Node)")
-# plt.xlabel("Time [s]")
-# plt.ylabel("Count of Solutions")
+plt.subplot(1,2,2)
+plt.hist(energies, bins=20, color='salmon', edgecolor='black')
+plt.title("Histogram of Final Battery Usage")
+plt.xlabel("Used Battery [Wh]")
+plt.ylabel("Count of Solutions")
 
-# plt.subplot(1,2,2)
-# plt.hist(energies, bins=20, color='salmon', edgecolor='black')
-# plt.title("Histogram of Final Battery Usage (No Loops, Single Switch/Node)")
-# plt.xlabel("Used Battery [Wh]")
-# plt.ylabel("Count of Solutions")
+plt.tight_layout()
+plt.show()
 
-# plt.tight_layout()
-# plt.show()
 
-# # %%
-
-# # Extract times and energies from your list of solutions
-# # each solution is in the form (path, total_time, final_used_energy)
-# times    = [sol[1] for sol in all_paths_prune]
-# energies = [sol[2] for sol in all_paths_prune]
-
-# plt.figure(figsize=(6, 5))
-# plt.scatter(times, energies, alpha=0.7, color='blue', edgecolors='black')
-# plt.xlabel("Travel Time [s]")
-# plt.ylabel("Final Used Battery [Wh]")
-# plt.title("Path Time vs. Final Battery Usage")
-# plt.grid(True)
-# plt.show()
+plt.figure(figsize=(6, 5))
+plt.scatter(times, energies, alpha=0.7, color='blue', edgecolors='black')
+plt.xlabel("Travel Time [s]")
+plt.ylabel("Final Used Battery [Wh]")
+plt.title("Path Time vs. Final Battery Usage")
+plt.grid(True)
+plt.show()
 
 # %%
