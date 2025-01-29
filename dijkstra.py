@@ -14,7 +14,7 @@ from dijkstra_scenario import build_world_graph
 from dijkstra_visualize import visualize_world_with_multiline
 
 
-G_world=build_world_graph(id=0)
+G_world=build_world_graph(id=None)
 visualize_world_with_multiline(G_world)
 
 
@@ -364,33 +364,56 @@ def find_all_feasible_paths(G_world, L, start, goal):
     # todo here reduce number of paths
     # don't analyse all simple paths in L
 
-    simple_paths_in_world = list(nx.all_simple_paths(G_world, source=start[0], target=goal[0]))
-    print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
-    
-    subgraphs = []
-    for path in simple_paths_in_world:
-        print(f"Simple path: {path}")
-        path_node_set = set(path)
-        selected_nodes = [node for node in L.nodes if node[0] in path_node_set]
-        subgraph = L.subgraph(selected_nodes).copy()
-        subgraphs.append(subgraph)
-
-    print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
-
-
-
+    speedup = True
     analysed_paths = 0
     feasible_paths = []
 
-    for subgraph in subgraphs:
-        for path in nx.all_simple_paths(subgraph, source=start, target=goal):
+    if speedup:
+        simple_paths_in_world = list(nx.all_simple_paths(G_world, source=start[0], target=goal[0]))
+        print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
+        
+        subgraphs = []
+        for path in simple_paths_in_world:
+            print(f"Simple path: {path}")
+            path_node_set = set(path)
+            selected_nodes = [node for node in L.nodes if node[0] in path_node_set]
+            subgraph = L.subgraph(selected_nodes).copy()
+            subgraphs.append(subgraph)
+
+        print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
+
+        for subgraph in subgraphs:
+            for path in nx.all_simple_paths(subgraph, source=start, target=goal):
+                analysed_paths += 1
+
+                node_visit_counts = defaultdict(int)
+                is_valid = True
+
+                for node, mode in path:
+                    node_visit_counts[node] += 1
+                    if node_visit_counts[node] > 2:
+                        is_valid = False
+                        break
+
+                if is_valid:
+                    if not path in feasible_paths:
+                        feasible_paths.append(path)
+
+    else:
+        for path in nx.all_simple_paths(L, source=start, target=goal):
             analysed_paths += 1
 
             node_visit_counts = defaultdict(int)
             is_valid = True
 
+            last_node = start[0]
             for node, mode in path:
                 node_visit_counts[node] += 1
+                if node_visit_counts[node] == 2 and not last_node == node:
+                    is_valid = False
+                    break
+                else:
+                    last_node = node
                 if node_visit_counts[node] > 2:
                     is_valid = False
                     break
@@ -401,8 +424,6 @@ def find_all_feasible_paths(G_world, L, start, goal):
     print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
 
     return feasible_paths
-
-
 
 
 paths = find_all_feasible_paths(G_world, L, start, goal)
