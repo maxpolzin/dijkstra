@@ -15,6 +15,7 @@ from dijkstra_visualize import visualize_world_with_multiline
 
 
 G_world=build_world_graph(id=None)
+visualize_world_with_multiline(G_world)
 
 
 ###############################################################################
@@ -336,5 +337,178 @@ visualize_world_with_multiline(G_world, path_states, switch_nodes, recharge_set,
 
 # visualize_world_with_multiline(G_world)
 
+
+
 #%%
 
+def find_all_paths_prune_morphs(
+    L, 
+    start_node, 
+    start_mode, 
+    goal_node, 
+    goal_mode,
+    battery_capacity,
+    recharge_time,
+    dbg=False
+):
+    """
+    Enumerate all feasible *loop-free* paths in the layered graph L:
+      1) No revisiting the same layered-state (node, mode).
+      2) Only allow at most ONE mode switch at a given node. That is, if you
+         switch modes at node N once, you cannot switch again at node N.
+
+    Returns:
+      all_solutions = [ (path, total_time, final_used_energy), ... ]
+                      where path is list of (node, mode).
+    """
+
+    # We'll store states on the stack as:
+    # (path, time_so_far, used_energy, visited_layered, switched_nodes)
+    #  - path: list of (node, mode)
+    #  - visited_layered: set of (node, mode) visited in this path
+    #  - switched_nodes: set of nodes in the original graph where we've switched modes
+    #
+    # Also keep a global dict best_time_at_state for pruning expansions that are strictly worse.
+    best_time_at_state = {}  # keyed by (node, mode), value = best_time
+
+    start_state = (
+        [(start_node, start_mode)],   # path
+        0.0,                          # time so far
+        0.0,                          # used energy
+        {(start_node, start_mode)},   # visited_layered
+        set()                         # switched_nodes
+    )
+    stack = [start_state]
+
+    all_solutions = []
+
+    while stack:
+        path, cur_time, cur_used, visited_layered, switched_nodes = stack.pop()
+        cur_node, cur_mode = path[-1]
+
+        # Check goal
+        if (cur_node == goal_node) and (cur_mode == goal_mode):
+            all_solutions.append((path, cur_time, cur_used))
+            continue
+
+        # Prune globally if we have found a strictly better time for (cur_node, cur_mode)
+        prev_best = best_time_at_state.get((cur_node, cur_mode), float('inf'))
+        if cur_time >= prev_best:
+            continue
+
+        best_time_at_state[(cur_node, cur_mode)] = cur_time
+
+        # Explore neighbors
+        for nbr in L.successors((cur_node, cur_mode)):
+            edge_data   = L[(cur_node, cur_mode)][nbr]
+            edge_time   = edge_data.get('time', 0.0)
+            edge_energy = edge_data.get('energy_Wh', 0.0)
+            nbr_node, nbr_mode = nbr
+
+            # Check if (nbr_node, nbr_mode) is already in visited_layered => loop => skip
+            if (nbr_node, nbr_mode) in visited_layered:
+                continue
+
+            # Detect if this edge is a "mode switch" on the same node
+            is_switch = (nbr_node == cur_node) and (nbr_mode != cur_mode)
+
+            if is_switch:
+                # We are switching mode at node "cur_node"
+                if cur_node in switched_nodes:
+                    # Already switched mode at this node => skip
+                    continue
+                # else we can do one switch here
+                new_switched = switched_nodes.union({cur_node})
+            else:
+                new_switched = switched_nodes  # no new node-switch
+
+            # Check battery logic
+            if cur_used + edge_energy <= battery_capacity:
+                new_time = cur_time + edge_time
+                new_used = cur_used + edge_energy
+            else:
+                # Need partial recharge if possible
+                if edge_energy > battery_capacity:
+                    # can't do it
+                    continue
+                recharge_time_adjusted = (cur_used / battery_capacity) * recharge_time
+                new_time = cur_time + recharge_time_adjusted + edge_time
+                new_used = edge_energy
+
+            new_path = path + [(nbr_node, nbr_mode)]
+            new_visited_layered = visited_layered.union({(nbr_node, nbr_mode)})
+
+            new_state = (
+                new_path,
+                new_time,
+                new_used,
+                new_visited_layered,
+                new_switched
+            )
+            stack.append(new_state)
+
+    return all_solutions
+
+
+
+# Now find all solutions with morph-pruning
+all_paths_prune = find_all_paths_prune_morphs(
+    L,
+    start_node=0, 
+    start_mode='drive',
+    goal_node=7, 
+    goal_mode='drive',
+    battery_capacity=CONSTANTS['BATTERY_CAPACITY'],
+    recharge_time=CONSTANTS['RECHARGE_TIME'],
+    dbg=False
+)
+
+
+all_paths_prune.sort(key=lambda x: x[1])
+
+print("\n=== ALL SOLUTIONS (No Layered Loops, Single Switch/Node) ===")
+for i, (path, total_time, final_used) in enumerate(all_paths_prune, 1):
+    print(f"Solution #{i}:")
+    print(f"  Path: {path}")
+    print(f"  Total Time: {total_time:.2f} s")
+    print(f"  Final Used Battery: {final_used:.3f} Wh")
+    print("  --------------------------------")
+
+# If desired, create histograms
+import matplotlib.pyplot as plt
+
+times = [sol[1] for sol in all_paths_prune]
+energies = [sol[2] for sol in all_paths_prune]
+
+plt.figure(figsize=(12,5))
+plt.subplot(1,2,1)
+plt.hist(times, bins=20, color='skyblue', edgecolor='black')
+plt.title("Histogram of Travel Times (No Loops, Single Switch/Node)")
+plt.xlabel("Time [s]")
+plt.ylabel("Count of Solutions")
+
+plt.subplot(1,2,2)
+plt.hist(energies, bins=20, color='salmon', edgecolor='black')
+plt.title("Histogram of Final Battery Usage (No Loops, Single Switch/Node)")
+plt.xlabel("Used Battery [Wh]")
+plt.ylabel("Count of Solutions")
+
+plt.tight_layout()
+plt.show()
+
+# %%
+
+# Extract times and energies from your list of solutions
+# each solution is in the form (path, total_time, final_used_energy)
+times    = [sol[1] for sol in all_paths_prune]
+energies = [sol[2] for sol in all_paths_prune]
+
+plt.figure(figsize=(6, 5))
+plt.scatter(times, energies, alpha=0.7, color='blue', edgecolors='black')
+plt.xlabel("Travel Time [s]")
+plt.ylabel("Final Used Battery [Wh]")
+plt.title("Path Time vs. Final Battery Usage")
+plt.grid(True)
+plt.show()
+
+# %%
