@@ -1,7 +1,7 @@
 #%%
 
-%reload_ext autoreload
-%autoreload 2
+#%reload_ext autoreload
+#%autoreload 2
 
 # %matplotlib widget
 
@@ -14,7 +14,7 @@ from dijkstra_scenario import build_world_graph
 from dijkstra_visualize import visualize_world_with_multiline
 
 
-G_world=build_world_graph(id=None)
+G_world=build_world_graph(id=0)
 visualize_world_with_multiline(G_world)
 
 
@@ -81,7 +81,7 @@ def build_layered_graph(G_world):
     # 1) Create layered nodes
     for v in G_world.nodes():
         for m in modes_list:
-            L.add_node((v, m))
+            L.add_node((v, m), height=G_world.nodes[v]['height'])
 
     # 2) Add travel edges based on mode, terrain, height, distance, and energy constraints
     for (u, v) in G_world.edges():
@@ -106,7 +106,8 @@ def build_layered_graph(G_world):
                         (v, mode),
                         time=travel_time,
                         energy_Wh=energy_Wh,
-                        terrain=terr
+                        terrain=terr,
+                        distance=dist
                     )
                 # else:
                 #     print(f"Excluded edge {(u, v)} in mode '{mode}' due to high energy requirement: {energy_Wh:.3f} Wh")
@@ -122,7 +123,8 @@ def build_layered_graph(G_world):
                         (u, mode),
                         time=travel_time,
                         energy_Wh=energy_Wh,
-                        terrain=terr
+                        terrain=terr,
+                        distance=dist
                     )
                 # else:
                 #     print(f"Excluded edge {(v, u)} in mode '{mode}' due to high energy requirement: {energy_Wh:.3f} Wh")
@@ -141,7 +143,8 @@ def build_layered_graph(G_world):
                             (node, m2),
                             time=switch_time,
                             energy_Wh=switch_energy_wh,
-                            terrain='switch'
+                            terrain='switch',
+                            distance=0
                         )
                     # else:
                     #     print(f"Excluded mode-switch at node {node} from '{m1}' to '{m2}' due to high energy requirement.")
@@ -356,41 +359,53 @@ def to_string(path):
     return str
 
 
-def find_all_feasible_paths(L, start, goal):
+def find_all_feasible_paths(G_world, L, start, goal):
 
     # todo here reduce number of paths
-
     # don't analyse all simple paths in L
 
-    # get all simple paths in world graph
-    # get all subgraphs from L that contains all nodes in the simple paths from the world graph
+    simple_paths_in_world = list(nx.all_simple_paths(G_world, source=start[0], target=goal[0]))
+    print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
+    
+    subgraphs = []
+    for path in simple_paths_in_world:
+        print(f"Simple path: {path}")
+        path_node_set = set(path)
+        selected_nodes = [node for node in L.nodes if node[0] in path_node_set]
+        subgraph = L.subgraph(selected_nodes).copy()
+        subgraphs.append(subgraph)
 
-    # analyse this list of subgraphs with what below stands
+    print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
+
+
 
     analysed_paths = 0
-
     feasible_paths = []
-    for path in nx.all_simple_paths(L, source=start, target=goal):
-        analysed_paths += 1
 
-        node_visit_counts = defaultdict(int)
-        is_valid = True
+    for subgraph in subgraphs:
+        for path in nx.all_simple_paths(subgraph, source=start, target=goal):
+            analysed_paths += 1
 
-        for node, mode in path:
-            node_visit_counts[node] += 1
-            if node_visit_counts[node] > 2:
-                is_valid = False
-                break
+            node_visit_counts = defaultdict(int)
+            is_valid = True
 
-        if is_valid:
-            feasible_paths.append(path)
+            for node, mode in path:
+                node_visit_counts[node] += 1
+                if node_visit_counts[node] > 2:
+                    is_valid = False
+                    break
+
+            if is_valid:
+                feasible_paths.append(path)
 
     print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
 
     return feasible_paths
 
 
-paths = find_all_feasible_paths(L, start, goal)
+
+
+paths = find_all_feasible_paths(G_world, L, start, goal)
 
 
 # %%
