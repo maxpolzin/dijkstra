@@ -357,9 +357,22 @@ def to_string(path):
 
 
 def find_all_feasible_paths(L, start, goal):
+
+    # todo here reduce number of paths
+
+    # don't analyse all simple paths in L
+
+    # get all simple paths in world graph
+    # get all subgraphs from L that contains all nodes in the simple paths from the world graph
+
+    # analyse this list of subgraphs with what below stands
+
+    analysed_paths = 0
+
     feasible_paths = []
     for path in nx.all_simple_paths(L, source=start, target=goal):
-        
+        analysed_paths += 1
+
         node_visit_counts = defaultdict(int)
         is_valid = True
 
@@ -371,6 +384,8 @@ def find_all_feasible_paths(L, start, goal):
 
         if is_valid:
             feasible_paths.append(path)
+
+    print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
 
     return feasible_paths
 
@@ -394,7 +409,6 @@ def extract_time_energy(L, path):
             total_time += edge_time
             total_energy += edge_energy
 
-    # if more energy than battery capacity is used, include recharge time
     no_recharges = (total_energy // CONSTANTS['BATTERY_CAPACITY'])
     total_time +=  no_recharges * CONSTANTS['RECHARGE_TIME']
 
@@ -432,8 +446,8 @@ plt.ylabel("Count of Solutions")
 
 plt.subplot(1,2,2)
 plt.hist(energies, bins=20, color='salmon', edgecolor='black')
-plt.title("Histogram of Final Battery Usage")
-plt.xlabel("Used Battery [Wh]")
+plt.title("Histogram of Energy Consumption")
+plt.xlabel("Used Energy [Wh]")
 plt.ylabel("Count of Solutions")
 
 plt.tight_layout()
@@ -443,8 +457,8 @@ plt.show()
 plt.figure(figsize=(6, 5))
 plt.scatter(times, energies, alpha=0.7, color='blue', edgecolors='black')
 plt.xlabel("Travel Time [s]")
-plt.ylabel("Final Used Battery [Wh]")
-plt.title("Path Time vs. Final Battery Usage")
+plt.ylabel("Energy Consumption [Wh]")
+plt.title("Path Time vs. Energy Consumption")
 plt.grid(True)
 plt.show()
 
