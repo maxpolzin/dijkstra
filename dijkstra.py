@@ -36,10 +36,6 @@ CONSTANTS = {
     'RECHARGE_TIME': 1000.0,  # s
 }
 
-SWITCH_TIME   = 100.0   # s time penalty for mode switch
-SWITCH_ENERGY = 1.0     # Wh penalty for switching
-BATTERY_CAPACITY=15   # Wh
-RECHARGE_TIME=1000.0    # s
 
 
 def is_edge_allowed(mode, terrain, h1, h2, dist, power):
@@ -65,7 +61,7 @@ def is_edge_allowed(mode, terrain, h1, h2, dist, power):
     return False
 
 
-def exceeds_battery_capacity(energy_wh, battery_capacity=BATTERY_CAPACITY):
+def exceeds_battery_capacity(energy_wh, battery_capacity=CONSTANTS['BATTERY_CAPACITY']):
     return energy_wh > battery_capacity
 
 
