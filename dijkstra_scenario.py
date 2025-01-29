@@ -97,7 +97,7 @@ def build_world_graph(id=None):
         edges = [
             (0, 1, 200, "grass"),
             (2, 3, 400, "grass"),
-            (3, 6, 4050, "grass"),  # Note: 4050m seems unusually long for 'grass'
+            (3, 6, 405, "grass"),  # Note: 4050m seems unusually long for 'grass'
             (6, 7, 200, "grass"),
             (1, 4, 300, "water"),
             (4, 5, 100, "water"),
