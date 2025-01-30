@@ -1,16 +1,17 @@
 # %%
 
-%reload_ext autoreload
-%autoreload 2
+# %reload_ext autoreload
+# %autoreload 2
 
-%matplotlib widget
+# %matplotlib widget
 
 
 import networkx as nx
 import random
 import math
+import numpy as np
 
-from dijkstra_visualize import visualize_world_with_multiline_3D
+from dijkstra_visualize import visualize_world_with_multiline_3D, visualize_world_and_graph
 
 
 def determine_edge_attributes(u, v, G):
@@ -383,10 +384,15 @@ def build_world_graph(id=None):
             (5, 6, "cliff"),
             (3, 5, "slope"),
             (3, 0, "water"),
-            (2, 3, "cliff"),
             (4, 7, "cliff"),
-            (5, 7, "cliff"),
+            (4, 6, "cliff"),
             (3, 4, "slope"),
+            (5, 7, "cliff"),
+            #extra edges going through free space
+            # (2, 3, "cliff"),
+            # (0, 2, "cliff"),
+            # (0, 4, "cliff"),
+            # (0, 5, "cliff"),
         ]
 
         G = nx.Graph()
@@ -425,9 +431,53 @@ def build_world_graph(id=None):
         raise ValueError(f"Invalid scenario id: {id}. Valid options are 0, or None.")
 
 
+
+
+def build_world():
+    dem = np.zeros((1000, 1000))
+    terrain = np.full((1000, 1000), 'grass', dtype=object)
+
+    river_start_x = 200
+    river_end_x   = 350
+    river_start_y = 0
+    river_end_y   = 700
+    dem[river_start_y:river_end_y, river_start_x:river_end_x] = 0
+    terrain[river_start_y:river_end_y, river_start_x:river_end_x] = 'water'
+
+    plateau_start_y = 800
+    plateau_end_y   = 1000
+    plateau_start_x = 0
+    plateau_end_x   = 850
+    dem[plateau_start_y:plateau_end_y, plateau_start_x:plateau_end_x] = 100
+
+    slope_start_x = 400
+    slope_end_x   = 700
+    slope_start_y = 0
+    slope_end_y   = 800
+    for col in range(slope_start_x, slope_end_x):
+        slope_height = ((col - slope_start_x + 1) / (slope_end_x - slope_start_x)) * 100
+        dem[slope_start_y:slope_end_y, col] = slope_height
+
+    flat_start_x = 700
+    flat_end_x   = 850
+    last_slope_height = dem[:, slope_end_x - 1].copy()
+    dem[:, flat_start_x:flat_end_x] = last_slope_height[:, np.newaxis]
+
+    return dem, terrain
+
+
+
+
 if __name__ == "__main__":
     G = build_world_graph(id=1)
+    dem, terrain = build_world()
+
+    visualize_world_and_graph(dem, terrain, G)
+
     visualize_world_with_multiline_3D(G)
+
+
+
 
 
 

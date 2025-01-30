@@ -2,6 +2,9 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # needed for 3D projection
 
+import numpy as np
+from matplotlib.patches import Patch
+
 def short_mode_name(mode):
     return {
         'drive':'D',
@@ -241,5 +244,82 @@ def visualize_world_with_multiline_3D(
 
     plt.show()
 
+
+
+def visualize_world_and_graph(dem, terrain, G):
+    """
+    Visualize a 3D world from:
+      - dem: 2D numpy array of shape (size,size) for elevation z
+      - terrain: same shape, e.g. 'grass','water','cliff','slope' etc.
+      - G: a NetworkX graph with node attributes (x, y, height)
+
+    The function:
+      1. Creates a 3D surface plot of the DEM,
+      2. Colors the surface according to the terrain array,
+      3. Overlays the nodes & edges from graph G (in red).
+    """
+
+    size = dem.shape[0]
+    x = np.arange(size)
+    y = np.arange(size)
+    X, Y = np.meshgrid(x, y)
+
+    # Convert terrain labels to colors
+    # This is just an example; adapt to your terrain types:
+    terrain_colors = np.empty(dem.shape, dtype=object)
+    terrain_colors[terrain == 'water'] = 'blue'
+    terrain_colors[terrain == 'grass'] = 'green'
+    # If you have other terrain types like 'cliff' or 'slope', color them:
+    terrain_colors[(terrain != 'water') & (terrain != 'grass')] = 'gray'
+
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the DEM surface
+    surf = ax.plot_surface(
+        X, Y, dem,
+        facecolors=terrain_colors,
+        linewidth=0.5,
+        edgecolor='gray',
+        antialiased=False,
+        shade=False,
+        alpha=0.6
+    )
+
+    # Build a small legend for water vs grass
+    legend_elements = [
+        Patch(facecolor='blue', edgecolor='blue', label='Water'),
+        Patch(facecolor='green', edgecolor='green', label='Grass'),
+        Patch(facecolor='gray', edgecolor='gray', label='Other')
+    ]
+    ax.legend(handles=legend_elements, loc='upper right')
+
+    # Overlay the graph G
+    # We assume each node has attributes 'x','y','height'
+    # which should align with the DEM scale. 
+    # If your DEM is NxN => coords in [0,N), 
+    # ensure the graph coords match that range (or are scaled).
+    for node in G.nodes():
+        gx = G.nodes[node]['x']
+        gy = G.nodes[node]['y']
+        gz = G.nodes[node]['height']
+        ax.scatter(gx, gy, gz, color='red', s=40, zorder=10)
+
+    for (u, v) in G.edges():
+        x_u = G.nodes[u]['x']
+        y_u = G.nodes[u]['y']
+        z_u = G.nodes[u]['height']
+        x_v = G.nodes[v]['x']
+        y_v = G.nodes[v]['y']
+        z_v = G.nodes[v]['height']
+        ax.plot([x_u, x_v], [y_u, y_v], [z_u, z_v], color='red', linewidth=1.5, zorder=10)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Elevation')
+    ax.set_title('World DEM + Scenario Graph')
+    ax.view_init(elev=15, azim=-110)  # optional viewpoint angle
+
+    plt.show()
 
 # %%

@@ -14,7 +14,7 @@ from dijkstra_scenario import build_world_graph
 from dijkstra_visualize import visualize_world_with_multiline_3D
 
 
-G_world=build_world_graph(id=None)
+G_world=build_world_graph(id=1)
 visualize_world_with_multiline_3D(G_world)
 
 
