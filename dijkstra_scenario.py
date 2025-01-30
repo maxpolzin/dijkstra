@@ -5,6 +5,7 @@
 
 # %matplotlib widget
 
+
 import networkx as nx
 import random
 import math
@@ -42,8 +43,7 @@ def determine_edge_attributes(u, v, G):
     # Otherwise compute slope
     if dist_2d == 0:
         # Node overlap in x,y with different z => near vertical => cliff
-        terrain = "cliff"
-        return terrain, dist_3d
+        return "cliff", dist_3d
 
     slope_angle_deg = math.degrees(math.atan2(abs(dz), dist_2d))
     if slope_angle_deg > 50:
@@ -83,43 +83,43 @@ def terrain_counts(G):
 def random_shift_node_for_terrain(G, terrain_type):
     """
     Tries to enforce at least one edge of a certain terrain_type by
-    shifting node positions or changing node height. 
-    This is a simple heuristic: pick a random edge, force conditions 
-    that produce the desired terrain, then recompute all terrains.
+    shifting node positions or changing node height.
+    We skip shifting if the edge involves node 0, node (n-1), or 
+    either of the special nodes placed at (0.2,0.8)/(0.8,0.2).
     """
     edges_list = list(G.edges())
     if not edges_list:
         return  # No edges at all in the graph
 
-    u, v = random.choice(edges_list)
-    # Current positions/heights
-    x_u = G.nodes[u]['x']
-    y_u = G.nodes[u]['y']
-    # z_u = G.nodes[u]['height']  # could read if needed
-    x_v = G.nodes[v]['x']
-    y_v = G.nodes[v]['y']
-    # z_v = G.nodes[v]['height']
+    # Retrieve special node IDs from the graph
+    special_ids = G.graph.get('special_ids', [])
 
-    # We'll skip messing with the first or last node if chosen randomly,
-    # to preserve (0,0,0) and (1000,1000,0).
-    if u in (0, G.number_of_nodes()-1) or v in (0, G.number_of_nodes()-1):
+    u, v = random.choice(edges_list)
+    
+    # We'll skip messing with the first or last node
+    # or with any special node
+    if (
+        u in (0, G.number_of_nodes()-1) or 
+        v in (0, G.number_of_nodes()-1) or
+        u in special_ids or 
+        v in special_ids
+    ):
         return
 
     if terrain_type == "water":
         # We want z=0 at both ends => high chance of water
         G.nodes[u]['height'] = 0
         G.nodes[v]['height'] = 0
-    
+
     elif terrain_type == "grass":
         # Easiest way: ensure small slope angle => both z=0
         # Shift them for non-trivial 2D distance
         G.nodes[u]['height'] = 0
         G.nodes[v]['height'] = 0
-        # Shift them to avoid overlap
         G.nodes[u]['x'] = random.randint(100, 900)
         G.nodes[u]['y'] = random.randint(100, 900)
-        G.nodes[v]['x'] = G.nodes[u]['x'] + random.randint(100, 200)
-        G.nodes[v]['y'] = G.nodes[u]['y'] + random.randint(100, 200)
+        G.nodes[v]['x'] = G.nodes[u]['x'] + random.randint(200, 300)
+        G.nodes[v]['y'] = G.nodes[u]['y'] + random.randint(200, 300)
 
     elif terrain_type == "cliff":
         # slope_angle > 50 => set z diff=100, 2D distance small
@@ -127,11 +127,11 @@ def random_shift_node_for_terrain(G, terrain_type):
         G.nodes[v]['height'] = 100
         G.nodes[u]['x'] = random.randint(0, 1000)
         G.nodes[u]['y'] = random.randint(0, 1000)
-        G.nodes[v]['x'] = G.nodes[u]['x'] + random.uniform(-5, 5)
-        G.nodes[v]['y'] = G.nodes[u]['y'] + random.uniform(-5, 5)
+        G.nodes[v]['x'] = G.nodes[u]['x'] + random.uniform(-15, 15)
+        G.nodes[v]['y'] = G.nodes[u]['y'] + random.uniform(-15, 15)
 
     elif terrain_type == "slope":
-        # slope_angle in (15,50). 
+        # slope_angle in (15,50).
         # Set z diff=100, choose 2D dist in (about 80..370).
         G.nodes[u]['height'] = 0
         G.nodes[v]['height'] = 100
@@ -148,82 +148,112 @@ def my_random_geometric_graph(n, radius):
     """
     A simple O(n^2) implementation of a random geometric graph
     that does NOT rely on scipy.spatial.
-    - node 0 is fixed at (0,0), node n-1 is fixed at (1,1).
-    - all other nodes are placed randomly in (0,1).
-    - edges connect nodes whose Euclidean dist < radius.
+
+    - node 0 is fixed at (0,0)
+    - node n-1 is fixed at (1,1)
+    - pick 2 random IDs in {1..n-2}, place them at (0.2,0.8) and (0.8,0.2)
+    - all other nodes in {1..n-2} remain randomly in (0,1)
+    - edges connect nodes whose Euclidean dist < radius
     """
     G = nx.Graph()
 
-    # Place node 0 at (0,0), node n-1 at (1,1)
+    # Place node 0 at (0,0) and node n-1 at (1,1)
     G.add_node(0, pos=(0.0, 0.0))
-    for i in range(1, n-1):
-        G.add_node(i, pos=(random.random(), random.random()))
-    G.add_node(n-1, pos=(1.0, 1.0))
+    if n > 1:
+        G.add_node(n-1, pos=(1.0, 1.0))
 
-    # O(n^2) edge building
-    for i in range(n):
+    # If there's no space for interior nodes, just return G
+    if n <= 2:
+        return G
+
+    # We want 2 random IDs from {1..n-2} to fix at (0.2,0.8) & (0.8,0.2)
+    # The rest of the interior nodes remain random in (0,1).
+    candidates = list(range(1, n-1))
+    special_ids = []
+    if len(candidates) < 2:
+        # not enough to pick from => just place all random
+        for i in candidates:
+            px, py = random.random(), random.random()
+            G.add_node(i, pos=(px, py))
+    else:
+        special_ids = random.sample(candidates, 2)
+        sid1, sid2 = special_ids
+        # Place them at (0.2,0.8) and (0.8,0.2)
+        G.add_node(sid1, pos=(0.2, 0.8))
+        G.add_node(sid2, pos=(0.8, 0.2))
+
+        # Place the rest randomly
+        for i in candidates:
+            if i in special_ids:
+                continue
+            px, py = random.random(), random.random()
+            G.add_node(i, pos=(px, py))
+
+    # Store these special IDs in G.graph so we can skip shifting them
+    G.graph['special_ids'] = special_ids
+
+    # Build edges (O(n^2) approach)
+    for i in G.nodes():
         x1, y1 = G.nodes[i]['pos']
-        for j in range(i+1, n):
+        for j in G.nodes():
+            if j <= i:
+                continue
             x2, y2 = G.nodes[j]['pos']
-            dist2 = (x1 - x2)**2 + (y1 - y2)**2
+            dist2 = (x1 - x2) ** 2 + (y1 - y2) ** 2
             if dist2 < radius * radius:
                 G.add_edge(i, j)
+
     return G
 
 
-def generate_landscape_graph(num_nodes=8, radius=0.4, max_attempts=500):
+def generate_landscape_graph(num_nodes=8, radius=0.5, max_attempts=500):
     """
     1) Create a random geometric graph in [0,1]^2 with my_random_geometric_graph.
        Node 0 => (0,0), node n-1 => (1,1).
+       Two random IDs in {1..n-2} => (0.2,0.8), (0.8,0.2).
     2) Scale positions to [0,1000]^2 and randomly assign height in {0,100}.
        Then forcibly set node 0 => (0,0,0) and node n-1 => (1000,1000,0).
     3) For each edge, compute the terrain (cliff, slope, grass, water).
-    4) Ensure we have at least one of each terrain: 
+    4) Ensure we have at least one of each terrain:
        'water','grass','slope','cliff'.
        We'll attempt random shifts up to 10 times to fix missing terrains.
        We'll do up to max_attempts tries to find a valid graph.
+       While shifting, we skip the special nodes to avoid moving them.
     """
     desired_terrains = ['water', 'grass', 'slope', 'cliff']
 
     best_G = None
-    best_score = -1  # how many distinct terrain types we have
+    best_score = -1
 
     for _ in range(max_attempts):
         # Step 1: random geometric graph
         RGG = my_random_geometric_graph(num_nodes, radius)
 
-        # If too disconnected, skip. Or optionally ignore connectivity requirement
+        # If too disconnected, skip
         if not nx.is_connected(RGG):
             continue
 
-        # Step 2: Build our new graph G 
-        #         Scale positions, set heights, 
-        #         forcibly fix node 0 => (0,0,0) and node n-1 => (1000,1000,0).
+        # Step 2: Build our final graph G => scale coords, assign heights
         G = nx.Graph()
+        # Copy over the special_ids
+        G.graph['special_ids'] = RGG.graph.get('special_ids', [])
+
         for node in RGG.nodes():
             px, py = RGG.nodes[node]['pos']
-
-            # Default scale to [0,1000]
             sx = px * 1000
             sy = py * 1000
 
-            # For interior nodes, random height in {0,100}
-            hz = random.choice([0, 0, 100])
+            if node == 0:
+                # forcibly node 0 => (0,0,0)
+                G.add_node(node, x=0.0, y=0.0, height=0)
+            elif node == num_nodes - 1:
+                # forcibly node n-1 => (1000,1000,0)
+                G.add_node(node, x=1000.0, y=1000.0, height=0)
+            else:
+                hz = random.choice([0, 100])
+                G.add_node(node, x=sx, y=sy, height=hz)
 
-            G.add_node(node, x=sx, y=sy, height=hz)
-
-        # Force node 0 => (0,0,0)
-        G.nodes[0]['x'] = 0.0
-        G.nodes[0]['y'] = 0.0
-        G.nodes[0]['height'] = 0
-
-        # Force node n-1 => (1000,1000,0)
-        last = num_nodes - 1
-        G.nodes[last]['x'] = 1000.0
-        G.nodes[last]['y'] = 1000.0
-        G.nodes[last]['height'] = 0
-
-        # Add edges
+        # Add edges, compute terrain
         for (u, v) in RGG.edges():
             terr, dist_3d = determine_edge_attributes(u, v, G)
             G.add_edge(u, v, terrain=terr, distance=dist_3d)
@@ -232,7 +262,7 @@ def generate_landscape_graph(num_nodes=8, radius=0.4, max_attempts=500):
         counts = terrain_counts(G)
         missing = [t for t in desired_terrains if counts[t] < 1]
 
-        # Step 4: Try random shifts up to 10 times
+        # Attempt random shifts up to 10 times for missing terrains
         for _ in range(10):
             if not missing:
                 break
@@ -242,19 +272,18 @@ def generate_landscape_graph(num_nodes=8, radius=0.4, max_attempts=500):
             if new_counts[t_need] >= 1:
                 missing.remove(t_need)
 
-        # Evaluate how many distinct terrains we have now
+        # Evaluate how many distinct terrains we have
         final_counts = terrain_counts(G)
         have_terrains = sum(1 for t in desired_terrains if final_counts[t] > 0)
-
         if have_terrains == 4:
-            return G  # Perfect scenario => stop immediately
+            return G  # perfect => done
 
-        # Otherwise keep track of the best so far
+        # Track best so far
         if have_terrains > best_score:
             best_score = have_terrains
             best_G = G
 
-    print("Could not ensure all 4 terrain types after max_attempts.")
+    print("Could not ensure all 4 terrain types after max_attempts. Returning best found.")
     return best_G if best_G else nx.Graph()
 
 
@@ -298,14 +327,10 @@ def build_world_graph(id=None):
 
 
 if __name__ == "__main__":
-    G = build_world_graph()
+    G = build_world_graph(id=None)
     visualize_world_with_multiline_3D(G)
 
 
 
 
 # %%
-
-# G = build_world_graph(id=None)
-
-# visualize_world_with_multiline_3D(G)
