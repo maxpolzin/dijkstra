@@ -1,9 +1,9 @@
 # %%
 
-# %reload_ext autoreload
-# %autoreload 2
+%reload_ext autoreload
+%autoreload 2
 
-# %matplotlib widget
+%matplotlib widget
 
 
 import networkx as nx
@@ -292,7 +292,8 @@ def build_world_graph(id=None):
         return generate_landscape_graph()
 
     elif id == 0:
-        # Predefined scenario
+        # Predefined scenario with placeholders for x,y,
+        # then compute edge distance from (x,y,z)
         node_heights = {
             0: 0,
             1: 0,
@@ -303,31 +304,126 @@ def build_world_graph(id=None):
             6: 100,
             7: 100,
         }
+        # Example 2D coordinates (placeholders) for each node
+        node_coords = {
+            0: (0,   0),
+            1: (100, 0),
+            2: (100, 100),
+            3: (200, 100),
+            4: (100, 200),
+            5: (200, 200),
+            6: (300, 200),
+            7: (300, 300),
+        }
+
+        # Keep the same terrain definitions, ignore 'distance' from the array
         edges = [
-            (0, 1, 200, "grass"),
-            (2, 3, 400, "grass"),
-            (3, 6, 450, "grass"),
-            (6, 7, 200, "grass"),
-            (1, 4, 300, "water"),
-            (4, 5, 100, "water"),
-            (1, 2, 400, "slope"),
-            (5, 6, 300, "slope"),
-            (3, 5, 20,  "cliff"),
+            (0, 1, "grass"),
+            (2, 3, "grass"),
+            (3, 6, "grass"),
+            (6, 7, "grass"),
+            (1, 4, "water"),
+            (4, 5, "water"),
+            (1, 2, "slope"),
+            (5, 6, "slope"),
+            (3, 5, "cliff"),
         ]
+
         G = nx.Graph()
+
+        # Add nodes with x,y,height from the dicts above
         for node, height in node_heights.items():
-            G.add_node(node, x=0.0, y=0.0, height=height)
-        for u, v, distance, terrain in edges:
-            G.add_edge(u, v, distance=distance, terrain=terrain)
-        print("Built predefined scenario 0 with 8 nodes.")
+            x, y = node_coords[node]
+            G.add_node(node, x=x, y=y, height=height)
+
+        # Add edges with terrain; we'll compute the distance from coords next
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+
+        # Now compute the 3D distance from x,y,z
+        for (u, v) in G.edges():
+            x_u = G.nodes[u]['x']
+            y_u = G.nodes[u]['y']
+            z_u = G.nodes[u]['height']
+
+            x_v = G.nodes[v]['x']
+            y_v = G.nodes[v]['y']
+            z_v = G.nodes[v]['height']
+
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            dist_3d = (dx*dx + dy*dy + dz*dz) ** 0.5
+
+            G[u][v]['distance'] = dist_3d
+
+        print("Built predefined scenario 0 with 8 nodes, placeholder (x,y), and computed 3D distances.")
         return G
+
+
+    elif id == 1:
+        nodes = {
+            0: (0,   0, 0),
+            1: (100, 0, 0),
+            2: (100, 100, 0),
+            3: (200, 100, 0),
+            4: (100, 200, 100),
+            5: (200, 200, 0),
+            6: (300, 200, 0),
+            7: (300, 300, 0),
+        }
+
+        # Keep the same terrain definitions, ignore 'distance' from the array
+        edges = [
+            (0, 1, "grass"),
+            (2, 3, "grass"),
+            (3, 6, "grass"),
+            (6, 7, "grass"),
+            (1, 4, "water"),
+            (4, 5, "water"),
+            (1, 2, "slope"),
+            (5, 6, "slope"),
+            (3, 5, "cliff"),
+        ]
+
+        G = nx.Graph()
+
+        # Add nodes with x,y,height from the dicts above
+        for node, coordinates in nodes.items():
+            x, y, z = coordinates
+            G.add_node(node, x=x, y=y, height=z)
+
+        # Add edges with terrain; we'll compute the distance from coords next
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+
+        # Now compute the 3D distance from x,y,z
+        for (u, v) in G.edges():
+            x_u = G.nodes[u]['x']
+            y_u = G.nodes[u]['y']
+            z_u = G.nodes[u]['height']
+
+            x_v = G.nodes[v]['x']
+            y_v = G.nodes[v]['y']
+            z_v = G.nodes[v]['height']
+
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            dist_3d = (dx*dx + dy*dy + dz*dz) ** 0.5
+
+            G[u][v]['distance'] = dist_3d
+
+        print("Built predefined scenario 0 with 8 nodes, placeholder (x,y), and computed 3D distances.")
+        return G
+
 
     else:
         raise ValueError(f"Invalid scenario id: {id}. Valid options are 0, or None.")
 
 
 if __name__ == "__main__":
-    G = build_world_graph(id=None)
+    G = build_world_graph(id=1)
     visualize_world_with_multiline_3D(G)
 
 
