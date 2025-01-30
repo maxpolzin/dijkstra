@@ -51,7 +51,7 @@ def build_edge_labels_for_world(G_world, L):
                         backward_items.append(f"{short_m}({t:.0f}s,{eW:.1f}Wh)")
 
         top_line = f"--> {', '.join(forward_items)}" if forward_items else ""
-        mid_line = f"{dist:.0f}m ({terr})"
+        mid_line = f"{dist:.0f}m\n({terr})" if top_line == "" else f"{dist:.0f}m ({terr})"
         bot_line = f"<-- {', '.join(backward_items)}" if backward_items else ""
 
         label_str = "\n".join(line for line in [top_line, mid_line, bot_line] if line)
