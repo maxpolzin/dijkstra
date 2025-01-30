@@ -361,14 +361,11 @@ def to_string(path):
 
 def find_all_feasible_paths(G_world, L, start, goal):
 
-    # todo here reduce number of paths
-    # don't analyse all simple paths in L
-
     speedup = True
     analysed_paths = 0
     feasible_paths = []
 
-    if speedup:
+    if speedup: # extract subgraphs for all simple paths from the world graph
         simple_paths_in_world = list(nx.all_simple_paths(G_world, source=start[0], target=goal[0]))
         print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
         
@@ -399,7 +396,7 @@ def find_all_feasible_paths(G_world, L, start, goal):
                     if not path in feasible_paths:
                         feasible_paths.append(path)
 
-    else:
+    else: # analyse all paths
         for path in nx.all_simple_paths(L, source=start, target=goal):
             analysed_paths += 1
 
