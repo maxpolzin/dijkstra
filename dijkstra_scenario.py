@@ -364,26 +364,29 @@ def build_world_graph(id=None):
     elif id == 1:
         nodes = {
             0: (0,   0, 0),
-            1: (100, 0, 0),
-            2: (100, 100, 0),
-            3: (200, 100, 0),
-            4: (100, 200, 100),
-            5: (200, 200, 0),
-            6: (300, 200, 0),
-            7: (300, 300, 0),
+            1: (200, 900, 0),
+            2: (200, 900, 100),
+            3: (400, 400, 0),
+            4: (800, 800, 100),
+            5: (800, 500, 100),
+            6: (810, 500, 0),
+            7: (1000, 300, 0),
         }
 
-        # Keep the same terrain definitions, ignore 'distance' from the array
         edges = [
             (0, 1, "grass"),
-            (2, 3, "grass"),
-            (3, 6, "grass"),
+            (4, 2, "grass"),
             (6, 7, "grass"),
-            (1, 4, "water"),
+            (3, 1, "grass"),
             (4, 5, "water"),
-            (1, 2, "slope"),
-            (5, 6, "slope"),
-            (3, 5, "cliff"),
+            (1, 2, "cliff"),
+            (5, 6, "cliff"),
+            (3, 5, "slope"),
+            (3, 0, "water"),
+            (2, 3, "cliff"),
+            (4, 7, "cliff"),
+            (5, 7, "cliff"),
+            (3, 4, "slope"),
         ]
 
         G = nx.Graph()
@@ -414,7 +417,7 @@ def build_world_graph(id=None):
 
             G[u][v]['distance'] = dist_3d
 
-        print("Built predefined scenario 0 with 8 nodes, placeholder (x,y), and computed 3D distances.")
+        print("Built predefined scenario 1 with 8 nodes, placeholder (x,y), and computed 3D distances.")
         return G
 
 

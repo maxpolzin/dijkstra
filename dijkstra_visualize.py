@@ -175,7 +175,7 @@ def visualize_world_with_multiline_3D(
         y = G_world.nodes[n].get('y', 0.0)
         z = G_world.nodes[n].get('height', 0.0)
         c = 'lightgreen' if z == 100 else 'darkgreen'
-        ax.scatter(x, y, z, color=c, s=60, depthshade=True)
+        ax.scatter(x, y, z, color=c, s=60, depthshade=True, alpha=0.3)
         ax.text(x, y, z, node_labels[n], fontsize=8, zorder=1)
 
     # Plot edges (gray by default)
