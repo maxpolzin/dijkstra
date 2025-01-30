@@ -1,70 +1,77 @@
-
 # %%
 
 # %reload_ext autoreload
 # %autoreload 2
 
+# %matplotlib widget
+
+
 import networkx as nx
 import random
+import math
 
-from dijkstra_visualize import visualize_world_with_multiline
+from dijkstra_visualize import visualize_world_with_multiline_2D, visualize_world_with_multiline_3D
 
 
-def determine_edge_attributes(u, v, G, terrain_specs):
-    height_u = G.nodes[u]['height']
-    height_v = G.nodes[v]['height']
-    
-    if height_u == 0 and height_v == 0:
+def determine_edge_attributes(u, v, G):
+    z_u = G.nodes[u]['height']
+    z_v = G.nodes[v]['height']
+    x_u = G.nodes[u]['x']
+    y_u = G.nodes[u]['y']
+    x_v = G.nodes[v]['x']
+    y_v = G.nodes[v]['y']
+
+    dist = math.sqrt((x_u - x_v)**2 + (y_u - y_v)**2 + (z_u - z_v)**2)
+
+    if z_u == 0 and z_v == 0:
         possible_terrains = ["grass", "water"]
-    elif height_u != height_v:
+    elif z_u != z_v:
         possible_terrains = ["slope", "cliff"]
     else:
         possible_terrains = ["grass"]
-    
+
     terrain = random.choice(possible_terrains)
-    distance = random.randint(*terrain_specs[terrain])
-    
-    return terrain, distance
+    return terrain, dist
 
 
-def generate_landscape_graph(num_nodes=8, 
-                             additional_edge_range=(4, 8)):
-
-    terrain_specs = {
-        'grass': (300, 700),
-        'slope': (650, 800),
-        'water': (200, 300),
-        'cliff': (90, 120)
-    }
-
-    # Possible height values for nodes
-    height_options = [0, 0, 100]
-
-    # Create a Path Graph to ensure node 0 and node num_nodes-1 are far apart
-    base_graph = nx.path_graph(num_nodes)
-
-    # Initialize a new graph and assign node attributes
+def generate_landscape_graph(num_nodes=8, additional_edge_range=(4, 8)):
     G = nx.Graph()
-    for node in base_graph.nodes():
-        height = random.choice(height_options)
-        G.add_node(node, height=height)
 
-    # Assign edge attributes from the base path graph
-    for u, v in base_graph.edges():
-        terrain, distance = determine_edge_attributes(u, v, G, terrain_specs)
-        G.add_edge(u, v, terrain=terrain, distance=distance)
+    # Assign random (x, y) and height=z
+    # Height options remain [0, 0, 100]
+    height_options = [0, 0, 100]
+    for node in range(num_nodes):
+        G.add_node(
+            node,
+            x=random.uniform(0, 100),
+            y=random.uniform(0, 100),
+            height=random.choice(height_options)
+        )
 
-    # Add additional random edges to increase connectivity
+    # Create a base path graph for guaranteed connectivity between 0 and last
+    base_path = list(range(num_nodes))
+    for i in range(len(base_path) - 1):
+        u = base_path[i]
+        v = base_path[i + 1]
+        terrain, dist = determine_edge_attributes(u, v, G)
+        G.add_edge(u, v, terrain=terrain, distance=dist)
+
+    # Add extra random edges
     additional_edges = random.randint(*additional_edge_range)
     attempts = 0
-    max_attempts = 1000  # Prevent infinite loop
+    max_attempts = 1000
     nodes = list(G.nodes())
-    
-    while G.number_of_edges() < base_graph.number_of_edges() + additional_edges and attempts < max_attempts:
+
+    while G.number_of_edges() < (num_nodes - 1 + additional_edges) and attempts < max_attempts:
         u, v = random.sample(nodes, 2)
-        if not G.has_edge(u, v) and not (abs(u - v) >= random.randint(3, 4)):
-            terrain, distance = determine_edge_attributes(u, v, G, terrain_specs)
-            G.add_edge(u, v, terrain=terrain, distance=distance)
+        if not G.has_edge(u, v):
+            # Avoid immediate neighbors in the path as we already have them
+            # or skip big jumps with some probability
+            if abs(u - v) >= random.randint(3, 4):
+                attempts += 1
+                continue
+            terrain, dist = determine_edge_attributes(u, v, G)
+            G.add_edge(u, v, terrain=terrain, distance=dist)
         attempts += 1
 
     if attempts == max_attempts:
@@ -73,16 +80,12 @@ def generate_landscape_graph(num_nodes=8,
     return G
 
 
-
-
-
 def build_world_graph(id=None):
-
     if id is None:
         return generate_landscape_graph()
 
     elif id == 0:
-        # First predefined scenario with 8 nodes
+        # Predefined scenario with 8 nodes (not strictly geometric)
         node_heights = {
             0: 0,
             1: 0,
@@ -108,10 +111,12 @@ def build_world_graph(id=None):
 
         G = nx.Graph()
         for node, height in node_heights.items():
-            G.add_node(node, height=height)
+            # Keep x,y as 0 for demonstration; scenario 0 isn't strictly geometric
+            G.add_node(node, x=0.0, y=0.0, height=height)
+
         for u, v, distance, terrain in edges:
             G.add_edge(u, v, distance=distance, terrain=terrain)
-        
+
         print("Built predefined scenario 0 with 8 nodes.")
         return G
 
@@ -120,6 +125,8 @@ def build_world_graph(id=None):
 
 
 
-# G = build_world_graph(id=None)
+G = build_world_graph(id=None)
 
-# visualize_world_with_multiline(G)
+visualize_world_with_multiline_2D(G)
+
+visualize_world_with_multiline_3D(G)

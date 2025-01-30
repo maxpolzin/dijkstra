@@ -1,9 +1,9 @@
 #%%
 
-#%reload_ext autoreload
-#%autoreload 2
+%reload_ext autoreload
+%autoreload 2
 
-# %matplotlib widget
+%matplotlib widget
 
 import math
 import heapq
@@ -11,11 +11,11 @@ import networkx as nx
 import random
 
 from dijkstra_scenario import build_world_graph
-from dijkstra_visualize import visualize_world_with_multiline
+from dijkstra_visualize import visualize_world_with_multiline_3D
 
 
 G_world=build_world_graph(id=None)
-visualize_world_with_multiline(G_world)
+visualize_world_with_multiline_3D(G_world)
 
 
 ###############################################################################
@@ -333,9 +333,8 @@ for node_mode in sorted_recharge_set:
 
 
 
-visualize_world_with_multiline(G_world, path_states, switch_nodes, recharge_set, L, CONSTANTS)
+visualize_world_with_multiline_3D(G_world, path_states, switch_nodes, recharge_set, L, CONSTANTS)
 
-# visualize_world_with_multiline(G_world)
 
 
 
