@@ -70,13 +70,15 @@ def build_layered_graph(G_world, modes, constants):
     return L
 
 
+
 class State:
     def __init__(self, node, mode, cum_energy, cum_time):
         self.node = node
         self.mode = mode
-        self.cum_energy = cum_energy
+        # cum_energy is the total energy consumed along the path.
+        self.cum_energy = cum_energy  
         self.cum_time = cum_time
-        self.cost = None   # computed combined cost
+        self.cost = None
         self.predecessor = None
         self.did_recharge = False
 
@@ -85,21 +87,20 @@ class State:
         return self.cost
 
     def __lt__(self, other):
-        # For heapq ordering.
         return self.cost < other.cost
 
     def __repr__(self):
-        return (f"State(node={self.node}, mode={self.mode}, "
-                f"energy={self.cum_energy:.2f}, time={self.cum_time:.2f}, cost={self.cost:.2f})")
+        return (f"State(node={self.node}, mode={self.mode}, cum_energy={self.cum_energy:.2f}, "
+                f"cum_time={self.cum_time:.2f}, cost={self.cost:.2f})")
 
 
 
 class Path:
-    def __init__(self, path_states):
-        self.path_states = path_states
-        if path_states:
-            self.total_time = path_states[-1].cum_time
-            self.total_energy = path_states[-1].cum_energy
+    def __init__(self, state_chain):
+        self.state_chain = state_chain
+        if state_chain:
+            self.total_time = state_chain[-1].cum_time
+            self.total_energy = state_chain[-1].cum_energy
             self.path = self.compute_path()
         else:
             self.total_time = float('inf')
@@ -109,11 +110,11 @@ class Path:
         self.switch_nodes = self.compute_switch_nodes()
 
     def compute_path(self):
-        return [(state.node, state.mode) for state in self.path_states]
+        return [(state.node, state.mode) for state in self.state_chain]
 
     def compute_recharge_events(self):
         events = set()
-        for state in self.path_states:
+        for state in self.state_chain:
             if state.did_recharge and state.predecessor is not None:
                 events.add((state.predecessor.node, state.predecessor.mode))
         return events
@@ -139,14 +140,13 @@ class Path:
 
 
 def layered_dijkstra_with_battery(G_world, start, goal, modes, constants, energy_vs_time=0.0, dbg=False):
-    # Build the layered graph.
     L = build_layered_graph(G_world, modes, constants)
     
-    # best_state keeps the best (lowest) combined cost seen for (node, mode)
+    # best_state holds the best cost seen for (node, mode)
     best_state = {}
     priority_queue = []
     
-    source = State(start[0], start[1], 0.0, 0.0)
+    source = State(start[0], start[1], cum_energy=0.0, cum_time=0.0)
     source.compute_cost(energy_vs_time)
     best_state[(source.node, source.mode)] = source.cost
     heapq.heappush(priority_queue, source)
@@ -156,43 +156,46 @@ def layered_dijkstra_with_battery(G_world, start, goal, modes, constants, energy
         
     while priority_queue:
         current_state = heapq.heappop(priority_queue)
+        
         if dbg:
             print(f"Popped {current_state}")
-        # Skip if this state is outdated.
+        
         if current_state.cost > best_state.get((current_state.node, current_state.mode), float('inf')):
             if dbg:
                 print("Skipping outdated state.")
             continue
-        
-        # Check if we have reached the goal.
+
         if (current_state.node, current_state.mode) == (goal[0], goal[1]):
-            path_states = []
+            state_chain = []
             state = current_state
             while state is not None:
-                path_states.append(state)
+                state_chain.append(state)
                 state = state.predecessor
-            path_states.reverse()
-            path_result = Path(path_states)
+            state_chain.reverse()
+            path_result = Path(state_chain)
             return (L, path_result)
         
-        # Explore each neighbor.
         for neighbor in L.successors((current_state.node, current_state.mode)):
             edge = L[(current_state.node, current_state.mode)][neighbor]
             edge_time = edge['time']
             edge_energy = edge.get('energy_Wh', 0.0)
             neighbor_node, neighbor_mode = neighbor
             
-            if current_state.cum_energy + edge_energy <= constants['BATTERY_CAPACITY']:
-                new_energy = current_state.cum_energy + edge_energy
-                new_time = current_state.cum_time + edge_time
+            # Compute battery usage as the remainder of cum_energy modulo battery capacity.
+            battery_usage = current_state.cum_energy % constants['BATTERY_CAPACITY']
+            battery_remaining = constants['BATTERY_CAPACITY'] - battery_usage
+
+            if edge_energy <= battery_remaining:
+                new_cum_energy = current_state.cum_energy + edge_energy
+                new_cum_time = current_state.cum_time + edge_time
                 did_recharge = False
             else:
-                recharge_time_adjusted = (current_state.cum_energy / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
-                new_time = current_state.cum_time + recharge_time_adjusted + edge_time
-                new_energy = edge_energy
+                recharge_time_adjusted = (battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
+                new_cum_energy = current_state.cum_energy + edge_energy
+                new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
                 did_recharge = True
             
-            new_state = State(neighbor_node, neighbor_mode, new_energy, new_time)
+            new_state = State(neighbor_node, neighbor_mode, new_cum_energy, new_cum_time)
             new_state.predecessor = current_state
             new_state.did_recharge = did_recharge
             new_state.compute_cost(energy_vs_time)
@@ -202,6 +205,5 @@ def layered_dijkstra_with_battery(G_world, start, goal, modes, constants, energy
                 heapq.heappush(priority_queue, new_state)
                 if dbg:
                     print(f"Updated: {new_state}")
-
-    # If no path is found, return a Path with an empty chain.
+                    
     return (L, Path([]))
