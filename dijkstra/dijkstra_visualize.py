@@ -143,13 +143,21 @@ def layered_path_to_mode_edges(path):
 
 def visualize_world_with_multiline_3D(
     G_world,
-    path_states=None,
-    switch_nodes=None,
-    recharge_nodes=None,
+    path_result = None,
     L=None,
     constants=None,
     title="World Graph with Costs (3D)"
 ):
+
+    if path_result is not None:
+        path_states = path_result.path
+        switch_nodes = path_result.switch_nodes
+        recharge_nodes = path_result.recharge_events
+    else:
+        path_states = None
+        switch_nodes = None
+        recharge_nodes = None
+
     edges_modes = layered_path_to_mode_edges(path_states)
     edges_by_mode = {
         'drive':[],

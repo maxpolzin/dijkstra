@@ -34,12 +34,14 @@ G_world=build_world_graph(id=None)
 
 visualize_world_with_multiline_3D(G_world)
 
-L, best_time, best_energy, best_path, recharge_nodes, switch_nodes = layered_dijkstra_with_battery(
-    G_world, start, goal, MODES, CONSTANTS, energy_vs_time=0.0)
+layered_graph, path_result = layered_dijkstra_with_battery(G_world, start, goal, MODES, CONSTANTS, energy_vs_time=0.0)
+
+visualize_world_with_multiline_3D(G_world, path_result, L, CONSTANTS)
+
+print(path_result)
 
 
-visualize_world_with_multiline_3D(G_world, best_path, switch_nodes, recharge_nodes, L, CONSTANTS)
-
+# %%
 
 print("=== LAYERED DIJKSTRA WITH BATTERY ===")
 print(f"Best time: {best_time:.1f}s")

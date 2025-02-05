@@ -70,113 +70,157 @@ def build_layered_graph(G_world, modes, constants):
     return L
 
 
-def combined_cost(time, energy):
-    return (1 - energy_vs_time) * time + energy_vs_time * energy
+class State:
+    def __init__(self, node, mode, cum_energy, cum_time):
+        self.node = node
+        self.mode = mode
+        self.cum_energy = cum_energy
+        self.cum_time = cum_time
+        self.cost = None   # computed combined cost
+        self.predecessor = None
+        self.did_recharge = False
+
+    def compute_cost(self, energy_vs_time):
+        self.cost = (1 - energy_vs_time) * self.cum_time + energy_vs_time * self.cum_energy
+        return self.cost
+
+    def __lt__(self, other):
+        # For heapq ordering.
+        return self.cost < other.cost
+
+    def __repr__(self):
+        return (f"State(node={self.node}, mode={self.mode}, "
+                f"energy={self.cum_energy:.2f}, time={self.cum_time:.2f}, cost={self.cost:.2f})")
+
+
+
+class PathResult:
+    def __init__(self, nodes, switch_nodes, recharge_events, total_time, total_energy):
+        self.nodes = nodes
+        self.switch_nodes = switch_nodes
+        self.recharge_events = recharge_events
+        self.total_time = total_time
+        self.total_energy = total_energy
+
+    def __str__(self):
+        path_str = f"Path: {self.nodes}\n"
+        switch_str = f"Switch nodes (IDs): {self.switch_nodes}\n"
+        recharge_str = "Recharge events (node, mode): " + ", ".join(str(r) for r in self.recharge_events) + "\n"
+        time_str = f"Total time: {self.total_time:.1f}s\n"
+        energy_str = f"Total energy: {self.total_energy:.3f} Wh"
+        return path_str + switch_str + recharge_str + time_str + energy_str
+
+
+
+class Path:
+    def __init__(self, path_states):
+        self.path_states = path_states
+        if path_states:
+            self.total_time = path_states[-1].cum_time
+            self.total_energy = path_states[-1].cum_energy
+            self.path = self.compute_path()
+        else:
+            self.total_time = float('inf')
+            self.total_energy = float('inf')
+            self.path = []
+        self.recharge_events = self.compute_recharge_events()
+        self.switch_nodes = self.compute_switch_nodes()
+
+    def compute_path(self):
+        return [(state.node, state.mode) for state in self.path_states]
+
+    def compute_recharge_events(self):
+        events = set()
+        for state in self.path_states:
+            if state.did_recharge and state.predecessor is not None:
+                events.add((state.predecessor.node, state.predecessor.mode))
+        return events
+
+    def compute_switch_nodes(self):
+        switches = set()
+        for i in range(len(self.path) - 1):
+            current_node, current_mode = self.path[i]
+            next_node, next_mode = self.path[i+1]
+            if current_node == next_node and current_mode != next_mode:
+                switches.add(current_node)
+        return switches
+
+    def __str__(self):
+        result = f"Path: {self.path}\n"
+        result += f"Switch nodes (IDs): {self.switch_nodes}\n"
+        result += "Recharge events (node, mode): " + ", ".join(str(r) for r in self.recharge_events) + "\n"
+        result += f"Total time: {self.total_time:.1f}s\n"
+        result += f"Total energy: {self.total_energy:.3f} Wh"
+        return result
+
+
+
 
 
 def layered_dijkstra_with_battery(G_world, start, goal, modes, constants, energy_vs_time=0.0, dbg=False):
-
+    # Build the layered graph.
     L = build_layered_graph(G_world, modes, constants)
-
-    dist = {}
-    pred = {}
-    recharged = {}
-    best_cost = {}
-
-    def combined_cost(time, energy):
-        return (1 - energy_vs_time) * time + energy_vs_time * energy
-
-    # Helper: update the cumulative energy and time given an edge.
-    def update_state(cur_energy, cur_time, edge_energy, edge_time):
-        if cur_energy + edge_energy <= constants['BATTERY_CAPACITY']:
-            return cur_energy + edge_energy, cur_time + edge_time, False
-        else:
-            recharge_time_adjusted = (cur_energy / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
-            return edge_energy, cur_time + recharge_time_adjusted + edge_time, True
-
-    # Helper: reconstruct path and collect recharge events.
-    def reconstruct_path(state):
-        path = []
-        recharge_set = set()
-        c = state
-        while c is not None:
-            path.append((c[0], c[1]))
-            p = pred.get(c)
-            if p is not None and recharged.get(c, False):
-                recharge_set.add((p[0], p[1]))
-            c = p
-        path.reverse()
-        return path, recharge_set
-
-    # Helper: find nodes where mode-switch occurred.
-    def find_mode_switch_nodes(path):
-        s = set()
-        for i in range(len(path) - 1):
-            (u_node, u_mode) = path[i]
-            (v_node, v_mode) = path[i + 1]
-            if (u_node == v_node) and (u_mode != v_mode):
-                s.add(u_node)
-        return s
-
-    source = (*start, 0.0, 0.0)  # state: (node, mode, cum_energy, cum_time)
-    initial_cost = combined_cost(0.0, 0.0)
-
-    dist[source] = initial_cost
-    pred[source] = None
-    recharged[source] = False
-    best_cost[(start[0], start[1])] = initial_cost
-
-    pq = [(initial_cost, source)]
+    
+    # best_state keeps the best (lowest) combined cost seen for (node, mode)
+    best_state = {}
+    priority_queue = []
+    
+    source = State(start[0], start[1], 0.0, 0.0)
+    source.compute_cost(energy_vs_time)
+    best_state[(source.node, source.mode)] = source.cost
+    heapq.heappush(priority_queue, source)
+    
     if dbg:
-        print(f"Initialized pq with {source} cost {initial_cost:.2f}")
-
-    while pq:
-        cur_cost, current_state = heapq.heappop(pq)
-        cur_node, cur_mode, cur_energy, cur_time = current_state
-
+        print(f"Initialized with {source}")
+        
+    while priority_queue:
+        current_state = heapq.heappop(priority_queue)
         if dbg:
-            print(f"Popped state: {current_state} cost {cur_cost:.2f}")
-        if cur_cost > dist.get(current_state, float('inf')):
+            print(f"Popped {current_state}")
+        # Skip if this state is outdated.
+        if current_state.cost > best_state.get((current_state.node, current_state.mode), float('inf')):
             if dbg:
-                print(f"Skipping {current_state} cost {cur_cost:.2f}")
+                print("Skipping outdated state.")
             continue
-
-        if (cur_node == goal[0]) and (cur_mode == goal[1]):
-            if dbg:
-                print(f"Reached goal {goal} cost {cur_cost:.2f}")
-            path, recharge_set = reconstruct_path(current_state)
-            sorted_recharge_nodes = [nm for nm in path if nm in recharge_set]
-            switch_nodes = find_mode_switch_nodes(path)
-            return (L, cur_time, cur_energy, path, sorted_recharge_nodes, switch_nodes)
-
-        for nbr in L.successors((cur_node, cur_mode)):
-            edge_data = L[(cur_node, cur_mode)][nbr]
-            edge_time = edge_data['time']
-            edge_energy = edge_data.get('energy_Wh', 0.0)
-            nbr_node, nbr_mode = nbr
-
-            if dbg:
-                print(f"Exploring {nbr} time {edge_time:.2f} energy {edge_energy:.2f}")
-
-            new_used, new_time, did_recharge = update_state(cur_energy, cur_time, edge_energy, edge_time)
-            next_state = (nbr_node, nbr_mode, new_used, new_time)
-            new_cost = combined_cost(new_time, new_used)
-
-            if (nbr_node, nbr_mode) in best_cost and new_cost >= best_cost[(nbr_node, nbr_mode)]:
-                if dbg:
-                    print(f"Skipping {next_state} cost {new_cost:.2f} >= {best_cost[(nbr_node, nbr_mode)]:.2f}")
-                continue
-            best_cost[(nbr_node, nbr_mode)] = new_cost
-
-            if new_cost < dist.get(next_state, float('inf')):
-                dist[next_state] = new_cost
-                pred[next_state] = current_state
-                recharged[next_state] = did_recharge
-                heapq.heappush(pq, (new_cost, next_state))
-                if dbg:
-                    print(f"Updated {next_state} cost {new_cost:.2f}")
+        
+        # Check if we have reached the goal.
+        if (current_state.node, current_state.mode) == (goal[0], goal[1]):
+            path_states = []
+            state = current_state
+            while state is not None:
+                path_states.append(state)
+                state = state.predecessor
+            path_states.reverse()
+            path_result = Path(path_states)
+            return (L, path_result)
+        
+        # Explore each neighbor.
+        for neighbor in L.successors((current_state.node, current_state.mode)):
+            edge = L[(current_state.node, current_state.mode)][neighbor]
+            edge_time = edge['time']
+            edge_energy = edge.get('energy_Wh', 0.0)
+            neighbor_node, neighbor_mode = neighbor
+            
+            if current_state.cum_energy + edge_energy <= constants['BATTERY_CAPACITY']:
+                new_energy = current_state.cum_energy + edge_energy
+                new_time = current_state.cum_time + edge_time
+                did_recharge = False
             else:
+                recharge_time_adjusted = (current_state.cum_energy / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
+                new_time = current_state.cum_time + recharge_time_adjusted + edge_time
+                new_energy = edge_energy
+                did_recharge = True
+            
+            new_state = State(neighbor_node, neighbor_mode, new_energy, new_time)
+            new_state.predecessor = current_state
+            new_state.did_recharge = did_recharge
+            new_state.compute_cost(energy_vs_time)
+            
+            if new_state.cost < best_state.get((neighbor_node, neighbor_mode), float('inf')):
+                best_state[(neighbor_node, neighbor_mode)] = new_state.cost
+                heapq.heappush(priority_queue, new_state)
                 if dbg:
-                    print(f"Skipping update for {next_state}")
+                    print(f"Updated: {new_state}")
 
-    return (L, float('inf'), float('inf'), [], set(), set())
+    # If no path is found, return a Path with an empty chain.
+    return (L, Path([]))
