@@ -94,24 +94,6 @@ class State:
 
 
 
-class PathResult:
-    def __init__(self, nodes, switch_nodes, recharge_events, total_time, total_energy):
-        self.nodes = nodes
-        self.switch_nodes = switch_nodes
-        self.recharge_events = recharge_events
-        self.total_time = total_time
-        self.total_energy = total_energy
-
-    def __str__(self):
-        path_str = f"Path: {self.nodes}\n"
-        switch_str = f"Switch nodes (IDs): {self.switch_nodes}\n"
-        recharge_str = "Recharge events (node, mode): " + ", ".join(str(r) for r in self.recharge_events) + "\n"
-        time_str = f"Total time: {self.total_time:.1f}s\n"
-        energy_str = f"Total energy: {self.total_energy:.3f} Wh"
-        return path_str + switch_str + recharge_str + time_str + energy_str
-
-
-
 class Path:
     def __init__(self, path_states):
         self.path_states = path_states
@@ -152,7 +134,6 @@ class Path:
         result += f"Total time: {self.total_time:.1f}s\n"
         result += f"Total energy: {self.total_energy:.3f} Wh"
         return result
-
 
 
 
