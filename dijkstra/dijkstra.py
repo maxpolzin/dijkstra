@@ -1,4 +1,4 @@
-#%%
+# %%
 
 %reload_ext autoreload
 %autoreload 2
@@ -32,25 +32,13 @@ goal = (7, 'drive')
 
 G_world=build_world_graph(id=None)
 
-visualize_world_with_multiline_3D(G_world)
+L, path_result = layered_dijkstra_with_battery(G_world, start, goal, MODES, CONSTANTS, energy_vs_time=0.0)
 
-layered_graph, path_result = layered_dijkstra_with_battery(G_world, start, goal, MODES, CONSTANTS, energy_vs_time=0.0)
-
-visualize_world_with_multiline_3D(G_world, path_result, L, CONSTANTS)
+visualize_world_with_multiline_3D(G_world, L, path_result, CONSTANTS, label_option="traveled_only")
 
 print(path_result)
 
 
-# %%
-
-print("=== LAYERED DIJKSTRA WITH BATTERY ===")
-print(f"Best time: {best_time:.1f}s")
-print(f"Total used energy: {best_energy:.3f} Wh")
-print("Path:", best_path)
-print("Switch nodes (IDs):", switch_nodes)
-print("Recharge events (node, mode):")
-for node_mode in recharge_nodes:
-    print(f" - Recharged at node {node_mode[0]} in mode '{node_mode[1]}'")
 
 
 
