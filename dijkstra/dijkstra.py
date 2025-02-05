@@ -31,18 +31,12 @@ start = (0, 'drive')
 goal = (7, 'drive')
 
 
-G_world=build_world_graph(id=None)
+G_world=build_world_graph(id=0)
 visualize_world_with_multiline_3D(G_world)
 
 
 L, best_time, best_energy, best_path, recharge_nodes, switch_nodes = layered_dijkstra_with_battery(
-    G_world, start, goal, MODES, CONSTANTS)
-
-
-
-# %%
-
-
+    G_world, start, goal, MODES, CONSTANTS, energy_vs_time=0.0)
 
 
 print("=== LAYERED DIJKSTRA WITH BATTERY ===")
