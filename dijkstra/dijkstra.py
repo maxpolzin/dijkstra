@@ -11,7 +11,6 @@ from dijkstra_visualize import visualize_world_with_multiline_3D
 from dijkstra_algorithm import layered_dijkstra_with_battery
 
 
-
 MODES = {
     'fly':   {'speed': 5.0,  'power': 1000.0},  # m/s, W
     'swim':  {'speed': 0.5,  'power':   10.0}, # Try 0.15 vs 0.16
@@ -31,12 +30,15 @@ start = (0, 'drive')
 goal = (7, 'drive')
 
 
-G_world=build_world_graph(id=0)
-visualize_world_with_multiline_3D(G_world)
+G_world=build_world_graph(id=None)
 
+visualize_world_with_multiline_3D(G_world)
 
 L, best_time, best_energy, best_path, recharge_nodes, switch_nodes = layered_dijkstra_with_battery(
     G_world, start, goal, MODES, CONSTANTS, energy_vs_time=0.0)
+
+
+visualize_world_with_multiline_3D(G_world, best_path, switch_nodes, recharge_nodes, L, CONSTANTS)
 
 
 print("=== LAYERED DIJKSTRA WITH BATTERY ===")
@@ -48,7 +50,6 @@ print("Recharge events (node, mode):")
 for node_mode in recharge_nodes:
     print(f" - Recharged at node {node_mode[0]} in mode '{node_mode[1]}'")
 
-visualize_world_with_multiline_3D(G_world, best_path, switch_nodes, recharge_nodes, L, CONSTANTS)
 
 
 
