@@ -29,12 +29,17 @@ CONSTANTS = {
 start = (0, 'drive')    
 goal = (7, 'drive')
 
+# straight_grass
+# straight_water
+# flat_slope_flat
+# fly_up_cliff
 
-G_world=build_world_graph(id=0)
+
+G_world=build_world_graph(id='fly_up_cliff')
 L=build_layered_graph(G_world, MODES, CONSTANTS)
 
 
-path_result = layered_dijkstra_with_battery(G_world, L, start, goal, MODES, CONSTANTS, energy_vs_time=1.0)
+path_result = layered_dijkstra_with_battery(G_world, L, start, goal, MODES, CONSTANTS,energy_vs_time=0.5)
 
 
 

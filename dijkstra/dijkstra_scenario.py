@@ -365,6 +365,134 @@ def build_world_graph(id=None):
         return G
 
 
+
+
+
+
+    elif id == "straight_grass":
+        # Scenario: Straight path on grass.
+        G = nx.Graph()
+        # Use string node IDs.
+        nodes = {
+            0: (0, 0, 0),
+            1: (300, 0, 0),
+            2: (600, 0, 0),
+            7: (900, 0, 0)
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        edges = [
+            (0, 1, "grass"),
+            (1, 2, "grass"),
+            (2, 7, "grass")
+        ]
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
+        print("Built scenario 'straight_grass'.")
+        return G
+
+
+    elif id == "straight_water":
+        # Scenario: Straight path on water.
+        G = nx.Graph()
+        nodes = {
+            0: (0, 0, 0),
+            1: (300, 0, 0),
+            2: (600, 0, 0),
+            7: (900, 0, 0)
+        }
+        for node, (x, y, z) in nodes.items():
+            # For water, height is assumed 0.
+            G.add_node(node, x=x, y=y, height=z)
+        edges = [
+            (0, 1, "water"),
+            (1, 2, "water"),
+            (2, 7, "water")
+        ]
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
+        print("Built scenario 'straight_water'.")
+        return G
+
+    elif id == "fly_up_cliff":
+        # Scenario: Robot must fly up a cliff.
+        # The path is: flat ground -> cliff -> flat top.
+        G = nx.Graph()
+        nodes = {
+            0: (0, 0, 0),       # flat ground
+            1: (300, 0, 0),     # start of cliff
+            2: (350, 0, 100),   # top of cliff
+            7: (600, 0, 100)    # flat top
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        # Define edges. Terrain between A-B: grass, B-C: cliff, C-D: grass.
+        edges = [
+            (0, 1, "grass"),
+            (1, 2, "cliff"),
+            (2, 7, "grass")
+        ]
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
+        print("Built scenario 'fly_up_cliff'.")
+        return G
+
+    elif id == "flat_slope_flat":
+
+        G = nx.Graph()
+        nodes = {
+            0: (0, 0, 0),       # flat start
+            1: (300, 0, 0),     # flat
+            2: (600, 0, 100),   # slope up to peak
+            3: (900, 0, 100),     # slope down back to flat
+            4: (1200, 0, 0),     # slope down back to flat
+            7: (1500, 0, 0)      # flat finish
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        # Define edges with appropriate terrain.
+        edges = [
+            (0, 1, "grass"),
+            (1, 2, "slope"),
+            (2, 3, "grass"),
+            (3, 4, "slope"),
+            (4, 7, "grass")
+        ]
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
+        print("Built scenario 'flat_slope_flat'.")
+        return G
+
+
+
         # distributions change/sensitityv w.r.t map/scenario variation
             # add scenario for straight path on grass
             # add sceanrio for straight path on water
