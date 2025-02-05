@@ -2,74 +2,13 @@ import math
 import random
 import heapq
 import networkx as nx
+from collections import defaultdict
 
-def get_edge_parameters(mode, terrain, h1, h2, dist, power, speed, constants):
-    travel_time = dist / speed
-    energy_Wh = (power * travel_time) / 3600.0
-    is_feasible = False
-
-    if mode == 'fly':
-        is_feasible = True
-    if terrain == 'water' and mode == 'swim':
-        is_feasible = True
-    if terrain == 'slope':
-        if mode == 'drive':
-            is_feasible = True
-        elif mode == 'roll':
-            is_feasible = (h1 == 100 and h2 == 0)
-    if terrain == 'grass' and mode == 'drive':
-        is_feasible = True
-
-    is_feasible = is_feasible and not exceeds_battery_capacity(energy_Wh, constants['BATTERY_CAPACITY'])
-    
-    if is_feasible:
-        return (travel_time, energy_Wh)
-
-    return None
-
-
-def exceeds_battery_capacity(energy_wh, battery_capacity):
-    return energy_wh > battery_capacity
-
-
-def build_layered_graph(G_world, modes, constants):
-    L = nx.DiGraph()
-    modes_list = list(modes.keys())
-    
-    for v in G_world.nodes():
-        for m in modes_list:
-            L.add_node((v, m), height=G_world.nodes[v]['height'])
-    
-    for (u, v) in G_world.edges():
-        dist = G_world[u][v]['distance']
-        terr = G_world[u][v]['terrain']
-        height_u = G_world.nodes[u]['height']
-        height_v = G_world.nodes[v]['height']
-        
-        for mode in modes_list:
-            forward_edge = get_edge_parameters(mode, terr, height_u, height_v, dist, modes[mode]['power'], modes[mode]['speed'], constants)
-            if forward_edge is not None: 
-                L.add_edge((u, mode), (v, mode), time=forward_edge[0], energy_Wh=forward_edge[1], terrain=terr, distance=dist)
-            backward_edge = get_edge_parameters(mode, terr, height_v, height_u, dist, modes[mode]['power'], modes[mode]['speed'], constants)
-            if backward_edge is not None:
-                L.add_edge((v, mode), (u, mode), time=backward_edge[0], energy_Wh=backward_edge[1], terrain=terr, distance=dist)
-
-    for node in G_world.nodes():
-        for m1 in modes_list:
-            for m2 in modes_list:
-                if m1 != m2:
-                    switch_energy_wh = constants['SWITCH_ENERGY']
-                    switch_time = constants['SWITCH_TIME']
-                    if not exceeds_battery_capacity(switch_energy_wh, constants['BATTERY_CAPACITY']):
-                        L.add_edge((node, m1), (node, m2),
-                                   time=switch_time,
-                                   energy_Wh=switch_energy_wh,
-                                   terrain='switch',
-                                   distance=0)
-
-    return L
-
-
+####################
+#
+# Functions finding the best path in the layered graph
+#
+####################
 
 class State:
     def __init__(self, node, mode, cum_energy, cum_time):
@@ -138,9 +77,7 @@ class Path:
 
 
 
-
-def layered_dijkstra_with_battery(G_world, start, goal, modes, constants, energy_vs_time=0.0, dbg=False):
-    L = build_layered_graph(G_world, modes, constants)
+def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, energy_vs_time=0.0, dbg=False):
     
     # best_state holds the best cost seen for (node, mode)
     best_state = {}
@@ -173,12 +110,12 @@ def layered_dijkstra_with_battery(G_world, start, goal, modes, constants, energy
                 state = state.predecessor
             state_chain.reverse()
             path_result = Path(state_chain)
-            return (L, path_result)
+            return path_result
         
         for neighbor in L.successors((current_state.node, current_state.mode)):
             edge = L[(current_state.node, current_state.mode)][neighbor]
             edge_time = edge['time']
-            edge_energy = edge.get('energy_Wh', 0.0)
+            edge_energy = edge['energy_Wh']
             neighbor_node, neighbor_mode = neighbor
             
             # Compute battery usage as the remainder of cum_energy modulo battery capacity.
@@ -206,4 +143,73 @@ def layered_dijkstra_with_battery(G_world, start, goal, modes, constants, energy
                 if dbg:
                     print(f"Updated: {new_state}")
                     
-    return (L, Path([]))
+    return Path([])
+
+
+####################
+#
+# Functions finding all feasible paths in the layered graph
+#
+####################
+def find_all_feasible_paths(G_world, L, start, goal):
+
+    speedup = True
+    analysed_paths = 0
+    feasible_paths = []
+
+    if speedup: # extract subgraphs for all simple paths from the world graph
+        simple_paths_in_world = list(nx.all_simple_paths(G_world, source=start[0], target=goal[0]))
+        print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
+        
+        subgraphs = []
+        for path in simple_paths_in_world:
+            print(f"Simple path: {path}")
+            path_node_set = set(path)
+            selected_nodes = [node for node in L.nodes if node[0] in path_node_set]
+            subgraph = L.subgraph(selected_nodes).copy()
+            subgraphs.append(subgraph)
+
+        print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
+
+        for subgraph in subgraphs:
+            for path in nx.all_simple_paths(subgraph, source=start, target=goal):
+                analysed_paths += 1
+
+                node_visit_counts = defaultdict(int)
+                is_valid = True
+
+                for node, mode in path:
+                    node_visit_counts[node] += 1
+                    if node_visit_counts[node] > 2:
+                        is_valid = False
+                        break
+
+                if is_valid:
+                    if not path in feasible_paths:
+                        feasible_paths.append(path)
+
+    else: # analyse all paths
+        for path in nx.all_simple_paths(L, source=start, target=goal):
+            analysed_paths += 1
+
+            node_visit_counts = defaultdict(int)
+            is_valid = True
+
+            last_node = start[0]
+            for node, mode in path:
+                node_visit_counts[node] += 1
+                if node_visit_counts[node] == 2 and not last_node == node:
+                    is_valid = False
+                    break
+                else:
+                    last_node = node
+                if node_visit_counts[node] > 2:
+                    is_valid = False
+                    break
+
+            if is_valid:
+                feasible_paths.append(path)
+
+    print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
+
+    return feasible_paths

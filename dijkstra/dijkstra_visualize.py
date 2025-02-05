@@ -30,13 +30,13 @@ def build_edge_labels_for_world(G_world, L):
                 # Look for forward options: from u to v.
                 if node == u and L.has_edge((u, mode), (v, mode)):
                     travel_time = L[(u, mode)][(v, mode)]['time']
-                    energy_cost = L[(u, mode)][(v, mode)].get('energy_Wh', 0.0)
+                    energy_cost = L[(u, mode)][(v, mode)]['energy_Wh']
                     forward_options.append(f"{short_mode_name(mode)}({travel_time:.0f}s,{energy_cost:.1f}Wh)")
                 
                 # Look for backward options: from v to u.
                 if node == v and L.has_edge((v, mode), (u, mode)):
                     travel_time = L[(v, mode)][(u, mode)]['time']
-                    energy_cost = L[(v, mode)][(u, mode)].get('energy_Wh', 0.0)
+                    energy_cost = L[(v, mode)][(u, mode)]['energy_Wh']
                     backward_options.append(f"{short_mode_name(mode)}({travel_time:.0f}s,{energy_cost:.1f}Wh)")
         
         label_forward = f"{', '.join(forward_options)}" if forward_options else ""
@@ -65,7 +65,7 @@ def build_edge_labels_for_path(G_world, L, path_states):
         # Retrieve the travel parameters for the actual mode used.
         if L is not None and L.has_edge((u, mode_u), (v, mode_u)):
             travel_time = L[(u, mode_u)][(v, mode_u)]['time']
-            energy_cost = L[(u, mode_u)][(v, mode_u)].get('energy_Wh', 0.0)
+            energy_cost = L[(u, mode_u)][(v, mode_u)]['energy_Wh']
             option_label = f"{short_mode_name(mode_u)}({travel_time:.0f}s, {energy_cost:.1f}Wh)"
         else:
             option_label = ""

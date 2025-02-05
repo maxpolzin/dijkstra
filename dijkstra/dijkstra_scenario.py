@@ -288,6 +288,9 @@ def generate_landscape_graph(num_nodes=8, radius=0.5, max_attempts=500):
     return best_G if best_G else nx.Graph()
 
 
+
+
+
 def build_world_graph(id=None):
     if id is None:
         return generate_landscape_graph()
@@ -471,6 +474,82 @@ def build_world_graph(id=None):
 
     else:
         raise ValueError(f"Invalid scenario id: {id}. Valid options are 0, or None.")
+
+
+
+
+
+def get_edge_parameters(mode, terrain, h1, h2, dist, power, speed, constants):
+    travel_time = dist / speed
+    energy_Wh = (power * travel_time) / 3600.0
+    is_feasible = False
+
+    if mode == 'fly':
+        is_feasible = True
+    if terrain == 'water' and mode == 'swim':
+        is_feasible = True
+    if terrain == 'slope':
+        if mode == 'drive':
+            is_feasible = True
+        elif mode == 'roll':
+            is_feasible = (h1 == 100 and h2 == 0)
+    if terrain == 'grass' and mode == 'drive':
+        is_feasible = True
+
+    is_feasible = is_feasible and not exceeds_battery_capacity(energy_Wh, constants['BATTERY_CAPACITY'])
+    
+    if is_feasible:
+        return (travel_time, energy_Wh)
+
+    return None
+
+
+def exceeds_battery_capacity(energy_wh, battery_capacity):
+    return energy_wh > battery_capacity
+
+
+def build_layered_graph(G_world, modes, constants):
+    L = nx.DiGraph()
+    modes_list = list(modes.keys())
+    
+    for v in G_world.nodes():
+        for m in modes_list:
+            L.add_node((v, m), height=G_world.nodes[v]['height'])
+    
+    for (u, v) in G_world.edges():
+        dist = G_world[u][v]['distance']
+        terr = G_world[u][v]['terrain']
+        height_u = G_world.nodes[u]['height']
+        height_v = G_world.nodes[v]['height']
+        
+        for mode in modes_list:
+            forward_edge = get_edge_parameters(mode, terr, height_u, height_v, dist, modes[mode]['power'], modes[mode]['speed'], constants)
+            if forward_edge is not None: 
+                L.add_edge((u, mode), (v, mode), time=forward_edge[0], energy_Wh=forward_edge[1], terrain=terr, distance=dist)
+            backward_edge = get_edge_parameters(mode, terr, height_v, height_u, dist, modes[mode]['power'], modes[mode]['speed'], constants)
+            if backward_edge is not None:
+                L.add_edge((v, mode), (u, mode), time=backward_edge[0], energy_Wh=backward_edge[1], terrain=terr, distance=dist)
+
+    for node in G_world.nodes():
+        for m1 in modes_list:
+            for m2 in modes_list:
+                if m1 != m2:
+                    switch_energy_wh = constants['SWITCH_ENERGY']
+                    switch_time = constants['SWITCH_TIME']
+                    if not exceeds_battery_capacity(switch_energy_wh, constants['BATTERY_CAPACITY']):
+                        L.add_edge((node, m1), (node, m2),
+                                   time=switch_time,
+                                   energy_Wh=switch_energy_wh,
+                                   terrain='switch',
+                                   distance=0)
+
+    return L
+
+
+
+
+
+
 
 
 

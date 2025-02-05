@@ -6,9 +6,9 @@
 %matplotlib widget
 
 
-from dijkstra_scenario import build_world_graph
+from dijkstra_scenario import build_world_graph, build_layered_graph
 from dijkstra_visualize import visualize_world_with_multiline_3D
-from dijkstra_algorithm import layered_dijkstra_with_battery
+from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths
 
 
 MODES = {
@@ -30,9 +30,13 @@ start = (0, 'drive')
 goal = (7, 'drive')
 
 
-G_world=build_world_graph(id=None)
+G_world=build_world_graph(id=0)
+L=build_layered_graph(G_world, MODES, CONSTANTS)
 
-L, path_result = layered_dijkstra_with_battery(G_world, start, goal, MODES, CONSTANTS, energy_vs_time=0.0)
+
+path_result = layered_dijkstra_with_battery(G_world, L, start, goal, MODES, CONSTANTS, energy_vs_time=1.0)
+
+
 
 visualize_world_with_multiline_3D(G_world, L, path_result, CONSTANTS, label_option="traveled_only")
 
@@ -44,9 +48,12 @@ print(path_result)
 
 
 
+
+
+
 # %%
 
-from collections import defaultdict
+
 
 def to_string(path):
     str = ""
@@ -62,68 +69,6 @@ def to_string(path):
     return str
 
 
-def find_all_feasible_paths(G_world, L, start, goal):
-
-    speedup = True
-    analysed_paths = 0
-    feasible_paths = []
-
-    if speedup: # extract subgraphs for all simple paths from the world graph
-        simple_paths_in_world = list(nx.all_simple_paths(G_world, source=start[0], target=goal[0]))
-        print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
-        
-        subgraphs = []
-        for path in simple_paths_in_world:
-            print(f"Simple path: {path}")
-            path_node_set = set(path)
-            selected_nodes = [node for node in L.nodes if node[0] in path_node_set]
-            subgraph = L.subgraph(selected_nodes).copy()
-            subgraphs.append(subgraph)
-
-        print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
-
-        for subgraph in subgraphs:
-            for path in nx.all_simple_paths(subgraph, source=start, target=goal):
-                analysed_paths += 1
-
-                node_visit_counts = defaultdict(int)
-                is_valid = True
-
-                for node, mode in path:
-                    node_visit_counts[node] += 1
-                    if node_visit_counts[node] > 2:
-                        is_valid = False
-                        break
-
-                if is_valid:
-                    if not path in feasible_paths:
-                        feasible_paths.append(path)
-
-    else: # analyse all paths
-        for path in nx.all_simple_paths(L, source=start, target=goal):
-            analysed_paths += 1
-
-            node_visit_counts = defaultdict(int)
-            is_valid = True
-
-            last_node = start[0]
-            for node, mode in path:
-                node_visit_counts[node] += 1
-                if node_visit_counts[node] == 2 and not last_node == node:
-                    is_valid = False
-                    break
-                else:
-                    last_node = node
-                if node_visit_counts[node] > 2:
-                    is_valid = False
-                    break
-
-            if is_valid:
-                feasible_paths.append(path)
-
-    print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
-
-    return feasible_paths
 
 
 paths = find_all_feasible_paths(G_world, L, start, goal)
@@ -144,7 +89,7 @@ def extract_time_energy(L, path):
 
         if L.has_edge((u_node, u_mode), (v_node, v_mode)):
             edge_time = L[(u_node, u_mode)][(v_node, v_mode)]['time']
-            edge_energy = L[(u_node, u_mode)][(v_node, v_mode)].get('energy_Wh', 0.0)
+            edge_energy = L[(u_node, u_mode)][(v_node, v_mode)]['energy_Wh']
             total_time += edge_time
             total_energy += edge_energy
 
@@ -169,7 +114,7 @@ def extract_mode_times_and_energies(L, path):
         if L.has_edge((u_node, u_mode), (v_node, v_mode)):
             edge_data = L[(u_node, u_mode)][(v_node, v_mode)]
             edge_time = edge_data['time']
-            edge_energy = edge_data.get('energy_Wh', 0.0)
+            edge_energy = edge_data['energy_Wh']
 
             if u_mode == v_mode and u_mode in mode_times:
                 mode_times[u_mode] += edge_time
