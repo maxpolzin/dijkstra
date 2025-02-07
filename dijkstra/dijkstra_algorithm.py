@@ -4,11 +4,7 @@ import heapq
 import networkx as nx
 from collections import defaultdict
 
-####################
-#
-# Functions finding the best path in the layered graph
-#
-####################
+
 
 class State:
     def __init__(self, node, mode, cum_energy, cum_time):
@@ -76,6 +72,58 @@ class Path:
         return result
 
 
+
+
+class MetaPath:
+
+    def __init__(self, path_obj, constants):
+        self.path_obj = path_obj
+        self.state_chain = path_obj.state_chain
+        self.total_time = path_obj.total_time
+        self.total_energy = path_obj.total_energy
+
+        # Use the Path object's computed recharge events and switch nodes.
+        self.recharge_events = path_obj.recharge_events
+        self.recharges = len(self.recharge_events)   # Number of recharge events.
+        self.switch_nodes = path_obj.switch_nodes
+        self.switches = len(self.switch_nodes)         # Number of switching nodes.
+        
+        # Initialize per-mode time and energy dictionaries.
+        self.mode_times = {}
+        self.mode_energies = {}
+
+        # Loop over consecutive states to compute the incremental time and energy.
+        # If the mode remains the same, attribute the interval to that mode;
+        # if it changes, attribute it to 'switching'.
+        for i in range(1, len(self.state_chain)):
+            prev_state = self.state_chain[i - 1]
+            curr_state = self.state_chain[i]
+            dt = curr_state.cum_time - prev_state.cum_time
+            dE = curr_state.cum_energy - prev_state.cum_energy
+            if prev_state.mode == curr_state.mode:
+                mode = prev_state.mode
+            else:
+                mode = 'switching'
+            self.mode_times[mode] = self.mode_times.get(mode, 0) + dt
+            self.mode_energies[mode] = self.mode_energies.get(mode, 0) + dE
+        
+        # Add the charging time based on the number of recharge events.
+        self.mode_times['charging'] = self.recharges * constants['RECHARGE_TIME']
+        
+    def __repr__(self):
+        return (f"MetaPath(total_time={self.total_time:.2f}, total_energy={self.total_energy:.2f}, "
+                f"recharges={self.recharges}, switches={self.switches}, "
+                f"mode_times={self.mode_times}, mode_energies={self.mode_energies})")
+
+
+
+
+
+####################
+#
+# Functions finding the best path in the layered graph
+#
+####################
 
 def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, energy_vs_time=0.0, dbg=False):
     
@@ -330,3 +378,12 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0
         print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
 
     return feasible_paths
+
+
+
+def analyze_paths(paths, constants):
+    meta_list = []
+    for p in paths:
+        meta = MetaPath(p, constants)
+        meta_list.append(meta)
+    return meta_list

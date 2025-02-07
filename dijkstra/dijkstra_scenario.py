@@ -434,17 +434,20 @@ def build_world_graph(id=None):
         G = nx.Graph()
         nodes = {
             0: (0, 0, 0),       # flat ground
-            1: (300, 0, 0),     # start of cliff
-            2: (350, 0, 100),   # top of cliff
-            7: (600, 0, 100)    # flat top
+            # 1: (300, 0, 0),     # start of cliff
+            1: (100, 0, 0),     # start of cliff
+            # 2: (350, 0, 100),   # top of cliff
+            # 7: (600, 0, 100)    # flat top
+            7: (100, 0, 100)    # flat top
         }
         for node, (x, y, z) in nodes.items():
             G.add_node(node, x=x, y=y, height=z)
         # Define edges. Terrain between A-B: grass, B-C: cliff, C-D: grass.
         edges = [
             (0, 1, "grass"),
-            (1, 2, "cliff"),
-            (2, 7, "grass")
+            # (1, 2, "cliff"),
+            # (1, 7, "grass")
+            (1, 7, "cliff")
         ]
         for (u, v, terrain) in edges:
             G.add_edge(u, v, terrain=terrain)
