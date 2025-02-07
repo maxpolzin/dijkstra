@@ -151,65 +151,182 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, ene
 # Functions finding all feasible paths in the layered graph
 #
 ####################
-def find_all_feasible_paths(G_world, L, start, goal):
 
+
+def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0.0, dbg=True):
+    """
+    Finds all feasible paths in the layered graph L from start to goal.
+    
+    Each feasible path is converted into a chain of State objects and wrapped in a Path object.
+    A feasible path is one in which no node is visited more than twice.
+    
+    Parameters:
+      - G_world: The world graph (nodes represent locations, ignoring modes).
+      - L: The layered graph. Its nodes are (node, mode) tuples and edges have attributes:
+           'time' (seconds) and 'energy_Wh' (energy consumption in Wh).
+      - start: A tuple (node, mode) representing the starting state.
+      - goal: A tuple (node, mode) representing the goal state.
+      - constants: A dictionary with keys:
+            'BATTERY_CAPACITY' : (float) battery capacity in Wh,
+            'RECHARGE_TIME'    : (float) time needed to recharge (in seconds).
+      - energy_vs_time: Weight parameter used to compute the cost of a state.
+      - dbg: Boolean; if True prints debug information.
+      
+    Returns:
+      - A list of Path objects (each encapsulating a state-chain and computed totals).
+    """
     speedup = True
     analysed_paths = 0
-    feasible_paths = []
+    feasible_paths = []  # Will hold Path objects
 
-    if speedup: # extract subgraphs for all simple paths from the world graph
+    if speedup:
+        # First, enumerate all simple paths in the world graph (ignoring modes)
         simple_paths_in_world = list(nx.all_simple_paths(G_world, source=start[0], target=goal[0]))
-        print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
-        
+        if dbg:
+            print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
+
+        # For each simple world path, extract the corresponding subgraph of L
         subgraphs = []
         for path in simple_paths_in_world:
-            print(f"Simple path: {path}")
+            if dbg:
+                print(f"Simple path in world: {path}")
             path_node_set = set(path)
             selected_nodes = [node for node in L.nodes if node[0] in path_node_set]
             subgraph = L.subgraph(selected_nodes).copy()
             subgraphs.append(subgraph)
 
-        print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
+        if dbg:
+            print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
 
+        # For each subgraph, enumerate all simple paths (which now include modes)
         for subgraph in subgraphs:
             for path in nx.all_simple_paths(subgraph, source=start, target=goal):
                 analysed_paths += 1
 
+                # Check feasibility: do not allow a world node (first element of tuple) to be visited >2 times
                 node_visit_counts = defaultdict(int)
                 is_valid = True
-
                 for node, mode in path:
                     node_visit_counts[node] += 1
                     if node_visit_counts[node] > 2:
                         is_valid = False
                         break
 
-                if is_valid:
-                    if not path in feasible_paths:
-                        feasible_paths.append(path)
+                if not is_valid:
+                    continue
 
-    else: # analyse all paths
+                # Convert the found simple path (list of (node, mode) pairs) into a chain of State objects.
+                state_chain = []
+                # Create the initial state.
+                initial_state = State(start[0], start[1], cum_energy=0.0, cum_time=0.0)
+                initial_state.compute_cost(energy_vs_time)
+                state_chain.append(initial_state)
+                current_state = initial_state
+
+                # Process each edge along the path, accumulating energy and time.
+                valid_edge_path = True
+                for i in range(1, len(path)):
+                    prev_node, prev_mode = path[i - 1]
+                    curr_node, curr_mode = path[i]
+
+                    if L.has_edge((prev_node, prev_mode), (curr_node, curr_mode)):
+                        edge_data = L[(prev_node, prev_mode)][(curr_node, curr_mode)]
+                        edge_time = edge_data['time']
+                        edge_energy = edge_data['energy_Wh']
+                    else:
+                        if dbg:
+                            print(f"Edge from {(prev_node, prev_mode)} to {(curr_node, curr_mode)} not found. Skipping path.")
+                        valid_edge_path = False
+                        break
+
+                    # Simulate battery usage and potential recharge, as in the Dijkstra code.
+                    battery_usage = current_state.cum_energy % constants['BATTERY_CAPACITY']
+                    battery_remaining = constants['BATTERY_CAPACITY'] - battery_usage
+
+                    if edge_energy <= battery_remaining:
+                        new_cum_energy = current_state.cum_energy + edge_energy
+                        new_cum_time = current_state.cum_time + edge_time
+                        did_recharge = False
+                    else:
+                        # Recharge enough to cover the edge energy consumption.
+                        recharge_time_adjusted = (battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
+                        new_cum_energy = current_state.cum_energy + edge_energy
+                        new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
+                        did_recharge = True
+
+                    # Create the new state along the path.
+                    new_state = State(curr_node, curr_mode, new_cum_energy, new_cum_time)
+                    new_state.predecessor = current_state
+                    new_state.did_recharge = did_recharge
+                    new_state.compute_cost(energy_vs_time)
+                    state_chain.append(new_state)
+                    current_state = new_state
+
+                if valid_edge_path:
+                    # Wrap the state chain in a Path object and add to the list of feasible paths.
+                    path_obj = Path(state_chain)
+                    feasible_paths.append(path_obj)
+
+    else:
+        # Without speedup: enumerate all simple paths in L directly.
         for path in nx.all_simple_paths(L, source=start, target=goal):
             analysed_paths += 1
 
             node_visit_counts = defaultdict(int)
             is_valid = True
-
-            last_node = start[0]
             for node, mode in path:
                 node_visit_counts[node] += 1
-                if node_visit_counts[node] == 2 and not last_node == node:
-                    is_valid = False
-                    break
-                else:
-                    last_node = node
                 if node_visit_counts[node] > 2:
                     is_valid = False
                     break
 
-            if is_valid:
-                feasible_paths.append(path)
+            if not is_valid:
+                continue
 
-    print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
+            state_chain = []
+            initial_state = State(start[0], start[1], cum_energy=0.0, cum_time=0.0)
+            initial_state.compute_cost(energy_vs_time)
+            state_chain.append(initial_state)
+            current_state = initial_state
+
+            valid_edge_path = True
+            for i in range(1, len(path)):
+                prev_node, prev_mode = path[i - 1]
+                curr_node, curr_mode = path[i]
+
+                if L.has_edge((prev_node, prev_mode), (curr_node, curr_mode)):
+                    edge_data = L[(prev_node, prev_mode)][(curr_node, curr_mode)]
+                    edge_time = edge_data['time']
+                    edge_energy = edge_data['energy_Wh']
+                else:
+                    valid_edge_path = False
+                    break
+
+                battery_usage = current_state.cum_energy % constants['BATTERY_CAPACITY']
+                battery_remaining = constants['BATTERY_CAPACITY'] - battery_usage
+
+                if edge_energy <= battery_remaining:
+                    new_cum_energy = current_state.cum_energy + edge_energy
+                    new_cum_time = current_state.cum_time + edge_time
+                    did_recharge = False
+                else:
+                    recharge_time_adjusted = (battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
+                    new_cum_energy = current_state.cum_energy + edge_energy
+                    new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
+                    did_recharge = True
+
+                new_state = State(curr_node, curr_mode, new_cum_energy, new_cum_time)
+                new_state.predecessor = current_state
+                new_state.did_recharge = did_recharge
+                new_state.compute_cost(energy_vs_time)
+                state_chain.append(new_state)
+                current_state = new_state
+
+            if valid_edge_path:
+                path_obj = Path(state_chain)
+                feasible_paths.append(path_obj)
+
+    if dbg:
+        print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
 
     return feasible_paths

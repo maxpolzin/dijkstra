@@ -60,97 +60,15 @@ print(path_result)
 
 
 
-def to_string(path):
-    str = ""
-    for i in range(len(path)):
-        node, mode = path[i]
-        if i != 0:
-            prev_node, prev_mode = path[i-1]
-            if prev_node != node:
-                str += f" -> {node}"
-        else:
-            str += f"{node}"
-        str += f"{mode[0].upper()}"
-    return str
 
 
+paths = find_all_feasible_paths(G_world, L, start, goal, constants=CONSTANTS)
 
-
-paths = find_all_feasible_paths(G_world, L, start, goal)
-
+for path in paths:
+    print(path)
 
 # %%
 
-import matplotlib.pyplot as plt
-import numpy as np
-
-def extract_time_energy(L, path):
-    total_time = 0.0
-    total_energy = 0.0
-
-    for i in range(len(path) - 1):
-        (u_node, u_mode) = path[i]
-        (v_node, v_mode) = path[i + 1]
-
-        if L.has_edge((u_node, u_mode), (v_node, v_mode)):
-            edge_time = L[(u_node, u_mode)][(v_node, v_mode)]['time']
-            edge_energy = L[(u_node, u_mode)][(v_node, v_mode)]['energy_Wh']
-            total_time += edge_time
-            total_energy += edge_energy
-
-    no_recharges = (total_energy // CONSTANTS['BATTERY_CAPACITY'])
-    total_time +=  no_recharges * CONSTANTS['RECHARGE_TIME']
-
-    return total_time, total_energy, no_recharges
-
-
-
-def extract_mode_times_and_energies(L, path):
-    # Initialize mode times
-    mode_times = {}
-    mode_energies = {}
-
-    total_energy = 0.0
-
-    for i in range(len(path) - 1):
-        (u_node, u_mode) = path[i]
-        (v_node, v_mode) = path[i + 1]
-
-        if L.has_edge((u_node, u_mode), (v_node, v_mode)):
-            edge_data = L[(u_node, u_mode)][(v_node, v_mode)]
-            edge_time = edge_data['time']
-            edge_energy = edge_data['energy_Wh']
-
-            if u_mode == v_mode and u_mode in mode_times:
-                mode_times[u_mode] += edge_time
-            elif u_mode == v_mode:
-                mode_times[u_mode] = edge_time
-            elif u_mode != v_mode and 'switching' in mode_times:
-                mode_times['switching'] += edge_time
-            elif u_mode != v_mode:
-                mode_times['switching'] = edge_time
-            else:
-                print(f"Edge from {u_node} to {v_node} has an unknown mode combination: {u_mode} -> {v_mode}")
-
-            if u_mode == v_mode and u_mode in mode_energies:
-                mode_energies[u_mode] += edge_energy
-            elif u_mode == v_mode:
-                mode_energies[u_mode] = edge_energy
-            elif u_mode != v_mode and 'switching' in mode_energies:
-                mode_energies['switching'] += edge_energy
-            elif u_mode != v_mode:
-                mode_energies['switching'] = edge_energy
-            else:
-                print(f"Edge from {u_node} to {v_node} has an unknown mode combination: {u_mode} -> {v_mode}")
-
-            total_energy += edge_energy
-
-    # Calculate the number of recharges
-    no_recharges = int(total_energy // CONSTANTS['BATTERY_CAPACITY'])
-    # Add charging time
-    mode_times['charging'] = no_recharges * CONSTANTS['RECHARGE_TIME']
-
-    return mode_times, mode_energies
 
 
 
