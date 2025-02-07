@@ -98,18 +98,25 @@ class MetaPath:
         for i in range(1, len(self.state_chain)):
             prev_state = self.state_chain[i - 1]
             curr_state = self.state_chain[i]
-            dt = curr_state.cum_time - prev_state.cum_time
+
             dE = curr_state.cum_energy - prev_state.cum_energy
+            remaining_battery_at_prev_state = constants['BATTERY_CAPACITY'] - (prev_state.cum_energy / constants['BATTERY_CAPACITY'] % 1) * constants['BATTERY_CAPACITY']
+            
+            if curr_state.did_recharge:
+                recharge_time = (constants['BATTERY_CAPACITY'] - remaining_battery_at_prev_state) / constants['BATTERY_CAPACITY'] * constants['RECHARGE_TIME']
+                self.mode_times['recharging'] = self.mode_times.get('recharging', 0) + recharge_time
+                dt = curr_state.cum_time - prev_state.cum_time - recharge_time
+            else:
+                dt = curr_state.cum_time - prev_state.cum_time
+
             if prev_state.mode == curr_state.mode:
                 mode = prev_state.mode
             else:
                 mode = 'switching'
-            self.mode_times[mode] = self.mode_times.get(mode, 0) + dt
             self.mode_energies[mode] = self.mode_energies.get(mode, 0) + dE
-        
-        # Add the charging time based on the number of recharge events.
-        self.mode_times['charging'] = self.recharges * constants['RECHARGE_TIME']
-        
+            self.mode_times[mode] = self.mode_times.get(mode, 0) + dt      
+
+
     def __repr__(self):
         return (f"MetaPath(total_time={self.total_time:.2f}, total_energy={self.total_energy:.2f}, "
                 f"recharges={self.recharges}, switches={self.switches}, "
@@ -164,22 +171,20 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, ene
             edge = L[(current_state.node, current_state.mode)][neighbor]
             edge_time = edge['time']
             edge_energy = edge['energy_Wh']
-            neighbor_node, neighbor_mode = neighbor
-            
-            # Compute battery usage as the remainder of cum_energy modulo battery capacity.
-            battery_usage = current_state.cum_energy % constants['BATTERY_CAPACITY']
-            battery_remaining = constants['BATTERY_CAPACITY'] - battery_usage
+            neighbor_node, neighbor_mode = neighbor        
+
+            battery_remaining = constants['BATTERY_CAPACITY'] - (current_state.cum_energy / constants['BATTERY_CAPACITY'] % 1) * constants['BATTERY_CAPACITY']
 
             if edge_energy <= battery_remaining:
                 new_cum_energy = current_state.cum_energy + edge_energy
                 new_cum_time = current_state.cum_time + edge_time
                 did_recharge = False
             else:
-                recharge_time_adjusted = (battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
+                recharge_time_adjusted = (1 - battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
                 new_cum_energy = current_state.cum_energy + edge_energy
                 new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
                 did_recharge = True
-            
+
             new_state = State(neighbor_node, neighbor_mode, new_cum_energy, new_cum_time)
             new_state.predecessor = current_state
             new_state.did_recharge = did_recharge
@@ -286,18 +291,16 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0
                             print(f"Edge from {(prev_node, prev_mode)} to {(curr_node, curr_mode)} not found. Skipping path.")
                         valid_edge_path = False
                         break
-
+                    
                     # Simulate battery usage and potential recharge, as in the Dijkstra code.
-                    battery_usage = current_state.cum_energy % constants['BATTERY_CAPACITY']
-                    battery_remaining = constants['BATTERY_CAPACITY'] - battery_usage
+                    battery_remaining = constants['BATTERY_CAPACITY'] - (current_state.cum_energy / constants['BATTERY_CAPACITY'] % 1) * constants['BATTERY_CAPACITY']
 
                     if edge_energy <= battery_remaining:
                         new_cum_energy = current_state.cum_energy + edge_energy
                         new_cum_time = current_state.cum_time + edge_time
                         did_recharge = False
                     else:
-                        # Recharge enough to cover the edge energy consumption.
-                        recharge_time_adjusted = (battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
+                        recharge_time_adjusted = (1 - battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
                         new_cum_energy = current_state.cum_energy + edge_energy
                         new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
                         did_recharge = True
@@ -350,15 +353,15 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0
                     valid_edge_path = False
                     break
 
-                battery_usage = current_state.cum_energy % constants['BATTERY_CAPACITY']
-                battery_remaining = constants['BATTERY_CAPACITY'] - battery_usage
+
+                battery_remaining = constants['BATTERY_CAPACITY'] - (current_state.cum_energy / constants['BATTERY_CAPACITY'] % 1) * constants['BATTERY_CAPACITY']
 
                 if edge_energy <= battery_remaining:
                     new_cum_energy = current_state.cum_energy + edge_energy
                     new_cum_time = current_state.cum_time + edge_time
                     did_recharge = False
                 else:
-                    recharge_time_adjusted = (battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
+                    recharge_time_adjusted = (1 - battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
                     new_cum_energy = current_state.cum_energy + edge_energy
                     new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
                     did_recharge = True

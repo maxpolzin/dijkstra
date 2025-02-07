@@ -15,17 +15,17 @@ from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_
 
 
 MODES = {
-    'fly':   {'speed': 5.0,  'power': 1000.0},  # m/s, W
+    'fly':   {'speed': 10.0,  'power': 1000.0},  # m/s, W
     'swim':  {'speed': 0.5,  'power':   10.0}, # Try 0.15 vs 0.16
     'roll':  {'speed': 3.0,  'power':    1.0},
-    'drive': {'speed': 1.0,  'power':   30.0},
+    'drive': {'speed': 1.0,  'power':   10.0},
 }
 
 CONSTANTS = {
     'SWITCH_TIME': 100.0,  # s time penalty for mode switch
     'SWITCH_ENERGY': 1.0,  # Wh penalty for switching
-    'BATTERY_CAPACITY': 30,  # Wh
-    'RECHARGE_TIME': 3000.0,  # s
+    'BATTERY_CAPACITY': 4,  # Wh
+    'RECHARGE_TIME': 1000.0,  # s
 }
 
 
@@ -51,14 +51,15 @@ print(optimal_path)
 
 
 
-# %%
-
 all_feasible_paths = find_all_feasible_paths(G_world, L, start, goal, constants=CONSTANTS)
 
 for path in all_feasible_paths:
     print(path)
 
 meta_paths = analyze_paths(all_feasible_paths, CONSTANTS)
+
+for meta_path in meta_paths:
+    print(meta_path)
 
 plot_basic_metrics(meta_paths)
 
