@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from dijkstra_scenario import build_world_graph, build_layered_graph
-from dijkstra_visualize import visualize_world_with_multiline_3D
+from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars
 from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths, analyze_paths
 
 
@@ -18,13 +18,15 @@ MODES = {
     'fly':   {'speed': 10.0,  'power': 1000.0},  # m/s, W
     'swim':  {'speed': 0.5,  'power':   10.0}, # Try 0.15 vs 0.16
     'roll':  {'speed': 3.0,  'power':    1.0},
-    'drive': {'speed': 1.0,  'power':   10.0},
+    'drive': {'speed': 1.0,  'power':   30.0},
 }
+
+# sth. wrong with modulo arithmetic: if edge is escatly 5? it doesnt detect charge
 
 CONSTANTS = {
     'SWITCH_TIME': 100.0,  # s time penalty for mode switch
     'SWITCH_ENERGY': 1.0,  # Wh penalty for switching
-    'BATTERY_CAPACITY': 4,  # Wh
+    'BATTERY_CAPACITY': 30.0,  # Wh
     'RECHARGE_TIME': 1000.0,  # s
 }
 
@@ -32,13 +34,13 @@ CONSTANTS = {
 start = (0, 'drive')    
 goal = (7, 'drive')
 
-# straight_grass
-# straight_water
-# flat_slope_flat
-# fly_up_cliff
+G_world=build_world_graph(id=None)
+# G_world=build_world_graph(id="straight_grass")
+# G_world=build_world_graph(id="straight_water")
+# G_world=build_world_graph(id="two_slopes")
+# G_world=build_world_graph(id="fly_up_cliff")
 
 
-G_world=build_world_graph(id='fly_up_cliff')
 L=build_layered_graph(G_world, MODES, CONSTANTS)
 
 
@@ -48,13 +50,12 @@ visualize_world_with_multiline_3D(G_world, L, optimal_path, CONSTANTS, label_opt
 
 print(optimal_path)
 
-
-
+# %%
 
 all_feasible_paths = find_all_feasible_paths(G_world, L, start, goal, constants=CONSTANTS)
 
-for path in all_feasible_paths:
-    print(path)
+# for path in all_feasible_paths:
+#     print(path)
 
 meta_paths = analyze_paths(all_feasible_paths, CONSTANTS)
 

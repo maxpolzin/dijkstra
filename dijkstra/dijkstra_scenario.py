@@ -6,6 +6,37 @@
 # %matplotlib widget
 
 
+
+# distributions change/sensitityv w.r.t map/scenario variation
+    # add scenario for straight path on grass
+    # add sceanrio for straight path on water
+    # add scenario where we have to fly up a cliff (without rolling)
+    # add scenario with two slopes
+    
+    # 3 random ones from a maps
+
+# sensitivity to robot/parameter changes
+    # delta 12 parameters
+
+    # take all above scenarios, 
+    # look at the paths of the pareto front
+    # vary one parameter at a time, 
+    # see how energy, time, mode change second pareto front 
+    # makes correspondece between good paths in both runs
+
+# sensitivity to multimodality
+    # take each scenario
+    # get the pareto points, min time and min energy, no. solutions
+    # remove each modality afterwards
+    # recalculate metrics
+    # result is a table scenario 1,2,3,4 vs. no mode
+    # no flying, no rolling, no swimming, no driving, no recharging
+
+# can we get optimal pareto paths 0.1/0.9 for energy/cost from higher resolution grids with complex graph
+
+
+
+
 import networkx as nx
 import random
 import math
@@ -296,28 +327,15 @@ def build_world_graph(id=None):
         return generate_landscape_graph()
 
     elif id == 0:
-        # Predefined scenario with placeholders for x,y,
-        # then compute edge distance from (x,y,z)
-        node_heights = {
-            0: 0,
-            1: 0,
-            2: 100,
-            3: 100,
-            4: 0,
-            5: 0,
-            6: 100,
-            7: 100,
-        }
-        # Example 2D coordinates (placeholders) for each node
-        node_coords = {
-            0: (0,   0),
-            1: (100, 0),
-            2: (100, 100),
-            3: (200, 100),
-            4: (100, 200),
-            5: (200, 200),
-            6: (300, 200),
-            7: (300, 300),
+        nodes = {
+            0: (0,   0, 0),
+            1: (100, 0, 0),
+            2: (100, 100, 100),
+            3: (200, 100, 100),
+            4: (100, 200, 0),
+            5: (200, 200, 0),
+            6: (300, 200, 100),
+            7: (300, 300, 100),
         }
 
         # Keep the same terrain definitions, ignore 'distance' from the array
@@ -336,9 +354,9 @@ def build_world_graph(id=None):
         G = nx.Graph()
 
         # Add nodes with x,y,height from the dicts above
-        for node, height in node_heights.items():
-            x, y = node_coords[node]
-            G.add_node(node, x=x, y=y, height=height)
+        for node, coordinates in nodes.items():
+            x, y, z = coordinates
+            G.add_node(node, x=x, y=y, height=z)
 
         # Add edges with terrain; we'll compute the distance from coords next
         for (u, v, terrain) in edges:
@@ -363,179 +381,6 @@ def build_world_graph(id=None):
 
         print("Built predefined scenario 0 with 8 nodes, placeholder (x,y), and computed 3D distances.")
         return G
-
-
-
-
-
-
-    elif id == "straight_grass":
-        # Scenario: Straight path on grass.
-        G = nx.Graph()
-        # Use string node IDs.
-        nodes = {
-            0: (0, 0, 0),
-            1: (300, 0, 0),
-            2: (600, 0, 0),
-            7: (900, 0, 0)
-        }
-        for node, (x, y, z) in nodes.items():
-            G.add_node(node, x=x, y=y, height=z)
-        edges = [
-            (0, 1, "grass"),
-            (1, 2, "grass"),
-            (2, 7, "grass")
-        ]
-        for (u, v, terrain) in edges:
-            G.add_edge(u, v, terrain=terrain)
-        for (u, v) in G.edges():
-            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
-            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
-            dx = x_u - x_v
-            dy = y_u - y_v
-            dz = z_u - z_v
-            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
-        print("Built scenario 'straight_grass'.")
-        return G
-
-
-    elif id == "straight_water":
-        # Scenario: Straight path on water.
-        G = nx.Graph()
-        nodes = {
-            0: (0, 0, 0),
-            1: (300, 0, 0),
-            2: (600, 0, 0),
-            7: (900, 0, 0)
-        }
-        for node, (x, y, z) in nodes.items():
-            # For water, height is assumed 0.
-            G.add_node(node, x=x, y=y, height=z)
-        edges = [
-            (0, 1, "water"),
-            (1, 2, "water"),
-            (2, 7, "water")
-        ]
-        for (u, v, terrain) in edges:
-            G.add_edge(u, v, terrain=terrain)
-        for (u, v) in G.edges():
-            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
-            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
-            dx = x_u - x_v
-            dy = y_u - y_v
-            dz = z_u - z_v
-            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
-        print("Built scenario 'straight_water'.")
-        return G
-
-    elif id == "fly_up_cliff":
-        # Scenario: Robot must fly up a cliff.
-        # The path is: flat ground -> cliff -> flat top.
-        G = nx.Graph()
-        nodes = {
-            0: (0, 0, 0),       # flat ground
-            # 1: (300, 0, 0),     # start of cliff
-            1: (100, 0, 0),     # start of cliff
-            # 2: (350, 0, 100),   # top of cliff
-            # 7: (600, 0, 100)    # flat top
-            7: (100, 0, 100)    # flat top
-        }
-        for node, (x, y, z) in nodes.items():
-            G.add_node(node, x=x, y=y, height=z)
-        # Define edges. Terrain between A-B: grass, B-C: cliff, C-D: grass.
-        edges = [
-            (0, 1, "grass"),
-            # (1, 2, "cliff"),
-            # (1, 7, "grass")
-            (1, 7, "cliff")
-        ]
-        for (u, v, terrain) in edges:
-            G.add_edge(u, v, terrain=terrain)
-        for (u, v) in G.edges():
-            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
-            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
-            dx = x_u - x_v
-            dy = y_u - y_v
-            dz = z_u - z_v
-            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
-        print("Built scenario 'fly_up_cliff'.")
-        return G
-
-    elif id == "flat_slope_flat":
-
-        G = nx.Graph()
-        nodes = {
-            0: (0, 0, 0),       # flat start
-            1: (300, 0, 0),     # flat
-            2: (600, 0, 100),   # slope up to peak
-            3: (900, 0, 100),     # slope down back to flat
-            4: (1200, 0, 0),     # slope down back to flat
-            7: (1500, 0, 0)      # flat finish
-        }
-        for node, (x, y, z) in nodes.items():
-            G.add_node(node, x=x, y=y, height=z)
-        # Define edges with appropriate terrain.
-        edges = [
-            (0, 1, "grass"),
-            (1, 2, "slope"),
-            (2, 3, "grass"),
-            (3, 4, "slope"),
-            (4, 7, "grass")
-        ]
-        for (u, v, terrain) in edges:
-            G.add_edge(u, v, terrain=terrain)
-        for (u, v) in G.edges():
-            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
-            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
-            dx = x_u - x_v
-            dy = y_u - y_v
-            dz = z_u - z_v
-            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
-        print("Built scenario 'flat_slope_flat'.")
-        return G
-
-
-
-        # distributions change/sensitityv w.r.t map/scenario variation
-            # add scenario for straight path on grass
-            # add sceanrio for straight path on water
-            # add scenario where we have to fly up a cliff (without rolling)
-            # add scenario with two slopes
-            
-            # 3 random ones from a maps
-
-
-        # sensitivity to robot/parameter changes
-            # delta 12 parameters
-
-            # take all above scenarios, 
-            # look at the paths of the pareto front
-            # vary one parameter at a time, 
-            # see how energy, time, mode change second pareto front 
-            # makes correspondece between good paths in both runs
-
-
-        # sensitivity to multimodality
-            # take each scenario
-            # get the pareto points, min time and min energy, no. solutions
-            # remove each modality afterwards
-            # recalculate metrics
-            # result is a table scenario 1,2,3,4 vs. no mode
-            # no flying, no rolling, no swimming, no driving, no recharging
-   
-
-
-
-        # can we get optimal pareto paths 0.1/0.9 for energy/cost from higher resolution grids with complex graph
-
-
-
-
-
-
-
-
-
 
 
     elif id == 1:
@@ -600,6 +445,135 @@ def build_world_graph(id=None):
             G[u][v]['distance'] = dist_3d
 
         print("Built predefined scenario 1 with 8 nodes, placeholder (x,y), and computed 3D distances.")
+        return G
+
+
+
+    elif id == "straight_grass":
+        G = nx.Graph()
+        # Define eight nodes in a straight line (x increases, same y and level)
+        nodes = {
+            0: (0, 0, 0),
+            1: (150, 0, 0),
+            2: (300, 0, 0),
+            3: (450, 0, 0),
+            4: (600, 0, 0),
+            5: (750, 0, 0),
+            6: (900, 0, 0),
+            7: (1050, 0, 0)
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        # Connect successive nodes with terrain "grass"
+        edges = [(i, i+1, "grass") for i in range(7)]
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        # Compute 3D distances on each edge
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
+        print("Built scenario 'straight_grass' with 8 nodes.")
+        return G
+
+    elif id == "straight_water":
+        G = nx.Graph()
+        # Define eight nodes in a straight line (same as grass but terrain "water")
+        nodes = {
+            0: (0, 0, 0),
+            1: (150, 0, 0),
+            2: (300, 0, 0),
+            3: (450, 0, 0),
+            4: (600, 0, 0),
+            5: (750, 0, 0),
+            6: (900, 0, 0),
+            7: (1050, 0, 0)
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        edges = [(i, i+1, "water") for i in range(7)]
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
+        print("Built scenario 'straight_water' with 8 nodes.")
+        return G
+
+    elif id == "fly_up_cliff":
+        G = nx.Graph()
+        # Define eight nodes with abrupt height changes.
+        # Pattern: flat, start climbing, top, start descending, bottom, start climbing again, top.
+        nodes = {
+            0: (0, 0, 0),         # flat ground
+            1: (150, 0, 0),       # flat ground
+            2: (300, 0, 100),     # cliff up
+            3: (450, 0, 100),     # flat top
+            4: (600, 0, 0),       # cliff down
+            5: (750, 0, 0),       # flat bottom
+            6: (900, 0, 100),     # cliff up
+            7: (1050, 0, 100)     # flat top
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        # Define edges using different terrain types:
+        # "grass" for flat segments and "cliff" for steep transitions.
+        edges = [
+            (0, 1, "grass"),
+            (1, 2, "cliff"),
+            (2, 3, "grass"),
+            (3, 4, "cliff"),
+            (4, 5, "grass"),
+            (5, 6, "cliff"),
+            (6, 7, "grass")
+        ]
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
+        print("Built scenario 'fly_up_cliff' with 8 nodes.")
+        return G
+
+    elif id == "two_slopes":
+        G = nx.Graph()
+        # Define eight nodes with two distinct slope cycles:
+        # First cycle: slope up then slope down; second cycle: slope up then slope down.
+        nodes = {
+            0: (0, 0, 0),         # start flat
+            1: (150, 0, 100),      # slope up
+            2: (300, 0, 0),     # peak
+            3: (450, 0, 100),      # slope down
+            4: (600, 0, 0),       # bottom
+            5: (750, 0, 100),      # slope up
+            6: (900, 0, 0),     # peak
+            7: (1050, 0, 100)       # slope down to flat finish
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        # Label all edges as "slope" since the primary change is gradual.
+        edges = [(i, i+1, "slope") for i in range(7)]
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = (dx*dx + dy*dy + dz*dz) ** 0.5
+        print("Built scenario 'two_slopes' with 8 nodes.")
         return G
 
 
@@ -721,10 +695,10 @@ def build_world():
 
 
 if __name__ == "__main__":
-    G = build_world_graph(id=1)
-    dem, terrain = build_world()
+    G = build_world_graph(id=2)
+    # dem, terrain = build_world()
 
-    visualize_world_and_graph(dem, terrain, G)
+    # visualize_world_and_graph(dem, terrain, G)
 
     visualize_world_with_multiline_3D(G)
 
