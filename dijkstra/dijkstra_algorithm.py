@@ -123,19 +123,10 @@ class MetaPath:
 #########################################
 
 def battery_remaining(current_state, constants):
-    """
-    Returns the remaining battery (Wh) based on the cumulative energy consumption.
-    This is equivalent to: BATTERY_CAPACITY - (cum_energy % BATTERY_CAPACITY)
-    """
     return constants['BATTERY_CAPACITY'] - (current_state.cum_energy % constants['BATTERY_CAPACITY'])
 
 
 def compute_edge_transition(current_state, edge_data, constants):
-    """
-    Simulates the transition over an edge given the current state, considering battery consumption
-    and the possibility of a recharge. Returns:
-       new_cum_energy, new_cum_time, did_recharge
-    """
     edge_time = edge_data['time']
     edge_energy = edge_data['energy_Wh']
     remaining = battery_remaining(current_state, constants)
@@ -154,10 +145,6 @@ def compute_edge_transition(current_state, edge_data, constants):
 
 
 def build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg=False):
-    """
-    Constructs a chain (list) of State objects from a given simple path in the layered graph.
-    If any expected edge is missing, returns None.
-    """
     state_chain = []
     # The first tuple in path is the starting state.
     start_node, start_mode = path[0]
@@ -187,15 +174,23 @@ def build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg=F
     return state_chain
 
 
+def process_simple_path(path, L, energy_vs_time, constants, dbg=False):
+    node_visit_counts = defaultdict(int)
+    for node, mode in path:
+        node_visit_counts[node] += 1
+        if node_visit_counts[node] > 2:
+            return None
+
+    state_chain = build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg)
+    if state_chain is None:
+        return None
+    return Path(state_chain)
+
 #########################################
 # Algorithms: Dijkstra & All Feasible Paths
 #########################################
 
 def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, energy_vs_time=0.0, dbg=False):
-    """
-    Finds the best (lowest cost) path in the layered graph L from start to goal using a Dijkstra-like algorithm.
-    The cost is computed as a weighted combination of cumulative time and energy.
-    """
     best_state = {}
     priority_queue = []
     
@@ -250,15 +245,11 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, ene
 
 
 def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0.0, dbg=True):
-    """
-    Finds all feasible paths in the layered graph L from start to goal.
-    A feasible path is one in which no world node is visited more than twice.
-    This function uses a "speedup" technique by first enumerating simple paths in the world graph.
-    """
     speedup = True
     analysed_paths = 0
     feasible_paths = []  # Will hold Path objects
 
+    subgraphs = []
     if speedup:
         # Enumerate simple paths in the world graph (ignoring modes).
         simple_paths_in_world = list(nx.all_simple_paths(G_world, source=start[0], target=goal[0]))
@@ -266,7 +257,6 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0
             print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
 
         # For each simple world path, extract the corresponding subgraph of L.
-        subgraphs = []
         for path in simple_paths_in_world:
             if dbg:
                 print(f"Simple path in world: {path}")
@@ -278,45 +268,16 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0
         if dbg:
             print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
 
-        # For each subgraph, enumerate all simple paths (which now include modes).
-        for subgraph in subgraphs:
-            for path in nx.all_simple_paths(subgraph, source=start, target=goal):
-                analysed_paths += 1
-
-                # Check feasibility: do not allow a world node (first element of tuple) to be visited >2 times.
-                node_visit_counts = defaultdict(int)
-                is_valid = True
-                for node, mode in path:
-                    node_visit_counts[node] += 1
-                    if node_visit_counts[node] > 2:
-                        is_valid = False
-                        break
-
-                if not is_valid:
-                    continue
-
-                state_chain = build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg)
-                if state_chain is not None:
-                    feasible_paths.append(Path(state_chain))
+    # Process each simple path (with modes) found in the subgraphs.
     else:
-        # Without the speedup: enumerate all simple paths in L directly.
-        for path in nx.all_simple_paths(L, source=start, target=goal):
+        subgraphs = [L]
+
+    for subgraph in subgraphs:
+        for path in nx.all_simple_paths(subgraph, source=start, target=goal):
             analysed_paths += 1
-
-            node_visit_counts = defaultdict(int)
-            is_valid = True
-            for node, mode in path:
-                node_visit_counts[node] += 1
-                if node_visit_counts[node] > 2:
-                    is_valid = False
-                    break
-
-            if not is_valid:
-                continue
-
-            state_chain = build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg)
-            if state_chain is not None:
-                feasible_paths.append(Path(state_chain))
+            p = process_simple_path(path, L, energy_vs_time, constants, dbg)
+            if p is not None:
+                feasible_paths.append(p)
 
     if dbg:
         print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
