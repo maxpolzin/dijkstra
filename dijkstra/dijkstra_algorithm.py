@@ -94,9 +94,7 @@ class MetaPath:
             prev_state = self.state_chain[i - 1]
             curr_state = self.state_chain[i]
 
-
             dE = curr_state.cum_energy - prev_state.cum_energy
-
             remaining_battery = battery_remaining(prev_state, constants)
 
             if curr_state.did_recharge:
