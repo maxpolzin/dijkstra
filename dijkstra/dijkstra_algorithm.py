@@ -135,11 +135,6 @@ def compute_edge_transition(current_state, edge_data, constants):
     edge_energy = edge_data['energy_Wh']
     remaining = battery_remaining(current_state, constants)
 
-    # Debugging: print edge energy and remaining battery.
-    # current energy and time   
-    print(f"Current state: {current_state}")
-    print(f"Remaining for travelling: {remaining}, Edge energy: {edge_energy}")
-
     if edge_energy <= remaining:
         new_cum_energy = current_state.cum_energy + edge_energy
         new_cum_time = current_state.cum_time + edge_time
@@ -149,8 +144,6 @@ def compute_edge_transition(current_state, edge_data, constants):
         new_cum_energy = current_state.cum_energy + edge_energy
         new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
         did_recharge = True
-
-    print(f"After edge travelling: {new_cum_energy}, {new_cum_time}, recharge: {did_recharge}")
 
     return new_cum_energy, new_cum_time, did_recharge
 
