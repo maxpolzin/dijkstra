@@ -4,15 +4,16 @@ import heapq
 import networkx as nx
 from collections import defaultdict
 
-
+#########################################
+# Core Classes
+#########################################
 
 class State:
     def __init__(self, node, mode, cum_energy, cum_time):
         self.node = node
         self.mode = mode
-        # cum_energy is the total energy consumed along the path.
-        self.cum_energy = cum_energy  
-        self.cum_time = cum_time
+        self.cum_energy = cum_energy  # Total energy consumed (Wh)
+        self.cum_time = cum_time      # Total time elapsed (s)
         self.cost = None
         self.predecessor = None
         self.did_recharge = False
@@ -27,7 +28,6 @@ class State:
     def __repr__(self):
         return (f"State(node={self.node}, mode={self.mode}, cum_energy={self.cum_energy:.2f}, "
                 f"cum_time={self.cum_time:.2f}, cost={self.cost:.2f})")
-
 
 
 class Path:
@@ -72,10 +72,7 @@ class Path:
         return result
 
 
-
-
 class MetaPath:
-
     def __init__(self, path_obj, constants):
         self.path_obj = path_obj
         self.state_chain = path_obj.state_chain
@@ -92,18 +89,17 @@ class MetaPath:
         self.mode_times = {}
         self.mode_energies = {}
 
-        # Loop over consecutive states to compute the incremental time and energy.
-        # If the mode remains the same, attribute the interval to that mode;
-        # if it changes, attribute it to 'switching'.
+        # Loop over consecutive states to compute incremental energy and time.
         for i in range(1, len(self.state_chain)):
             prev_state = self.state_chain[i - 1]
             curr_state = self.state_chain[i]
 
             dE = curr_state.cum_energy - prev_state.cum_energy
-            remaining_battery_at_prev_state = constants['BATTERY_CAPACITY'] - (prev_state.cum_energy / constants['BATTERY_CAPACITY'] % 1) * constants['BATTERY_CAPACITY']
+            # Compute the remaining battery using the helper (see below)
+            remaining_battery = constants['BATTERY_CAPACITY'] - (prev_state.cum_energy % constants['BATTERY_CAPACITY'])
             
             if curr_state.did_recharge:
-                recharge_time = (constants['BATTERY_CAPACITY'] - remaining_battery_at_prev_state) / constants['BATTERY_CAPACITY'] * constants['RECHARGE_TIME']
+                recharge_time = (constants['BATTERY_CAPACITY'] - remaining_battery) / constants['BATTERY_CAPACITY'] * constants['RECHARGE_TIME']
                 self.mode_times['recharging'] = self.mode_times.get('recharging', 0) + recharge_time
                 dt = curr_state.cum_time - prev_state.cum_time - recharge_time
             else:
@@ -114,8 +110,7 @@ class MetaPath:
             else:
                 mode = 'switching'
             self.mode_energies[mode] = self.mode_energies.get(mode, 0) + dE
-            self.mode_times[mode] = self.mode_times.get(mode, 0) + dt      
-
+            self.mode_times[mode] = self.mode_times.get(mode, 0) + dt
 
     def __repr__(self):
         return (f"MetaPath(total_time={self.total_time:.2f}, total_energy={self.total_energy:.2f}, "
@@ -123,18 +118,84 @@ class MetaPath:
                 f"mode_times={self.mode_times}, mode_energies={self.mode_energies})")
 
 
+#########################################
+# Helper Functions (Eliminate Duplication)
+#########################################
+
+def battery_remaining(current_state, constants):
+    """
+    Returns the remaining battery (Wh) based on the cumulative energy consumption.
+    This is equivalent to: BATTERY_CAPACITY - (cum_energy % BATTERY_CAPACITY)
+    """
+    return constants['BATTERY_CAPACITY'] - (current_state.cum_energy % constants['BATTERY_CAPACITY'])
 
 
+def compute_edge_transition(current_state, edge_data, constants):
+    """
+    Simulates the transition over an edge given the current state, considering battery consumption
+    and the possibility of a recharge. Returns:
+       new_cum_energy, new_cum_time, did_recharge
+    """
+    edge_time = edge_data['time']
+    edge_energy = edge_data['energy_Wh']
+    remaining = battery_remaining(current_state, constants)
 
-####################
-#
-# Functions finding the best path in the layered graph
-#
-####################
+    if edge_energy <= remaining:
+        new_cum_energy = current_state.cum_energy + edge_energy
+        new_cum_time = current_state.cum_time + edge_time
+        did_recharge = False
+    else:
+        recharge_time_adjusted = (1 - remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
+        new_cum_energy = current_state.cum_energy + edge_energy
+        new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
+        did_recharge = True
+
+    return new_cum_energy, new_cum_time, did_recharge
+
+
+def build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg=False):
+    """
+    Constructs a chain (list) of State objects from a given simple path in the layered graph.
+    If any expected edge is missing, returns None.
+    """
+    state_chain = []
+    # The first tuple in path is the starting state.
+    start_node, start_mode = path[0]
+    initial_state = State(start_node, start_mode, cum_energy=0.0, cum_time=0.0)
+    initial_state.compute_cost(energy_vs_time)
+    state_chain.append(initial_state)
+    current_state = initial_state
+
+    for i in range(1, len(path)):
+        prev_tuple = path[i - 1]
+        curr_tuple = path[i]
+
+        if not L.has_edge(prev_tuple, curr_tuple):
+            if dbg:
+                print(f"Edge from {prev_tuple} to {curr_tuple} not found. Skipping path.")
+            return None
+
+        edge_data = L[prev_tuple][curr_tuple]
+        new_cum_energy, new_cum_time, did_recharge = compute_edge_transition(current_state, edge_data, constants)
+        new_state = State(curr_tuple[0], curr_tuple[1], new_cum_energy, new_cum_time)
+        new_state.predecessor = current_state
+        new_state.did_recharge = did_recharge
+        new_state.compute_cost(energy_vs_time)
+        state_chain.append(new_state)
+        current_state = new_state
+
+    return state_chain
+
+
+#########################################
+# Algorithms: Dijkstra & All Feasible Paths
+#########################################
 
 def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, energy_vs_time=0.0, dbg=False):
-    
-    # best_state holds the best cost seen for (node, mode)
+    """
+    Finds the best (lowest cost) path in the layered graph L from start to goal using a Dijkstra-like algorithm.
+    The cost is computed as a weighted combination of cumulative time and energy.
+    """
     best_state = {}
     priority_queue = []
     
@@ -152,39 +213,28 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, ene
         if dbg:
             print(f"Popped {current_state}")
         
+        # Skip if a better state has already been processed.
         if current_state.cost > best_state.get((current_state.node, current_state.mode), float('inf')):
             if dbg:
                 print("Skipping outdated state.")
             continue
 
         if (current_state.node, current_state.mode) == (goal[0], goal[1]):
+            # Reconstruct the state chain for the found path.
             state_chain = []
             state = current_state
             while state is not None:
                 state_chain.append(state)
                 state = state.predecessor
             state_chain.reverse()
-            path_result = Path(state_chain)
-            return path_result
+            return Path(state_chain)
         
         for neighbor in L.successors((current_state.node, current_state.mode)):
             edge = L[(current_state.node, current_state.mode)][neighbor]
-            edge_time = edge['time']
-            edge_energy = edge['energy_Wh']
             neighbor_node, neighbor_mode = neighbor        
 
-            battery_remaining = constants['BATTERY_CAPACITY'] - (current_state.cum_energy / constants['BATTERY_CAPACITY'] % 1) * constants['BATTERY_CAPACITY']
-
-            if edge_energy <= battery_remaining:
-                new_cum_energy = current_state.cum_energy + edge_energy
-                new_cum_time = current_state.cum_time + edge_time
-                did_recharge = False
-            else:
-                recharge_time_adjusted = (1 - battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
-                new_cum_energy = current_state.cum_energy + edge_energy
-                new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
-                did_recharge = True
-
+            new_cum_energy, new_cum_time, did_recharge = compute_edge_transition(current_state, edge, constants)
+            
             new_state = State(neighbor_node, neighbor_mode, new_cum_energy, new_cum_time)
             new_state.predecessor = current_state
             new_state.did_recharge = did_recharge
@@ -199,46 +249,23 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, ene
     return Path([])
 
 
-####################
-#
-# Functions finding all feasible paths in the layered graph
-#
-####################
-
-
 def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0.0, dbg=True):
     """
     Finds all feasible paths in the layered graph L from start to goal.
-    
-    Each feasible path is converted into a chain of State objects and wrapped in a Path object.
-    A feasible path is one in which no node is visited more than twice.
-    
-    Parameters:
-      - G_world: The world graph (nodes represent locations, ignoring modes).
-      - L: The layered graph. Its nodes are (node, mode) tuples and edges have attributes:
-           'time' (seconds) and 'energy_Wh' (energy consumption in Wh).
-      - start: A tuple (node, mode) representing the starting state.
-      - goal: A tuple (node, mode) representing the goal state.
-      - constants: A dictionary with keys:
-            'BATTERY_CAPACITY' : (float) battery capacity in Wh,
-            'RECHARGE_TIME'    : (float) time needed to recharge (in seconds).
-      - energy_vs_time: Weight parameter used to compute the cost of a state.
-      - dbg: Boolean; if True prints debug information.
-      
-    Returns:
-      - A list of Path objects (each encapsulating a state-chain and computed totals).
+    A feasible path is one in which no world node is visited more than twice.
+    This function uses a "speedup" technique by first enumerating simple paths in the world graph.
     """
     speedup = True
     analysed_paths = 0
     feasible_paths = []  # Will hold Path objects
 
     if speedup:
-        # First, enumerate all simple paths in the world graph (ignoring modes)
+        # Enumerate simple paths in the world graph (ignoring modes).
         simple_paths_in_world = list(nx.all_simple_paths(G_world, source=start[0], target=goal[0]))
         if dbg:
             print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
 
-        # For each simple world path, extract the corresponding subgraph of L
+        # For each simple world path, extract the corresponding subgraph of L.
         subgraphs = []
         for path in simple_paths_in_world:
             if dbg:
@@ -251,12 +278,12 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0
         if dbg:
             print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
 
-        # For each subgraph, enumerate all simple paths (which now include modes)
+        # For each subgraph, enumerate all simple paths (which now include modes).
         for subgraph in subgraphs:
             for path in nx.all_simple_paths(subgraph, source=start, target=goal):
                 analysed_paths += 1
 
-                # Check feasibility: do not allow a world node (first element of tuple) to be visited >2 times
+                # Check feasibility: do not allow a world node (first element of tuple) to be visited >2 times.
                 node_visit_counts = defaultdict(int)
                 is_valid = True
                 for node, mode in path:
@@ -268,58 +295,11 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0
                 if not is_valid:
                     continue
 
-                # Convert the found simple path (list of (node, mode) pairs) into a chain of State objects.
-                state_chain = []
-                # Create the initial state.
-                initial_state = State(start[0], start[1], cum_energy=0.0, cum_time=0.0)
-                initial_state.compute_cost(energy_vs_time)
-                state_chain.append(initial_state)
-                current_state = initial_state
-
-                # Process each edge along the path, accumulating energy and time.
-                valid_edge_path = True
-                for i in range(1, len(path)):
-                    prev_node, prev_mode = path[i - 1]
-                    curr_node, curr_mode = path[i]
-
-                    if L.has_edge((prev_node, prev_mode), (curr_node, curr_mode)):
-                        edge_data = L[(prev_node, prev_mode)][(curr_node, curr_mode)]
-                        edge_time = edge_data['time']
-                        edge_energy = edge_data['energy_Wh']
-                    else:
-                        if dbg:
-                            print(f"Edge from {(prev_node, prev_mode)} to {(curr_node, curr_mode)} not found. Skipping path.")
-                        valid_edge_path = False
-                        break
-                    
-                    # Simulate battery usage and potential recharge, as in the Dijkstra code.
-                    battery_remaining = constants['BATTERY_CAPACITY'] - (current_state.cum_energy / constants['BATTERY_CAPACITY'] % 1) * constants['BATTERY_CAPACITY']
-
-                    if edge_energy <= battery_remaining:
-                        new_cum_energy = current_state.cum_energy + edge_energy
-                        new_cum_time = current_state.cum_time + edge_time
-                        did_recharge = False
-                    else:
-                        recharge_time_adjusted = (1 - battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
-                        new_cum_energy = current_state.cum_energy + edge_energy
-                        new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
-                        did_recharge = True
-
-                    # Create the new state along the path.
-                    new_state = State(curr_node, curr_mode, new_cum_energy, new_cum_time)
-                    new_state.predecessor = current_state
-                    new_state.did_recharge = did_recharge
-                    new_state.compute_cost(energy_vs_time)
-                    state_chain.append(new_state)
-                    current_state = new_state
-
-                if valid_edge_path:
-                    # Wrap the state chain in a Path object and add to the list of feasible paths.
-                    path_obj = Path(state_chain)
-                    feasible_paths.append(path_obj)
-
+                state_chain = build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg)
+                if state_chain is not None:
+                    feasible_paths.append(Path(state_chain))
     else:
-        # Without speedup: enumerate all simple paths in L directly.
+        # Without the speedup: enumerate all simple paths in L directly.
         for path in nx.all_simple_paths(L, source=start, target=goal):
             analysed_paths += 1
 
@@ -334,54 +314,14 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0
             if not is_valid:
                 continue
 
-            state_chain = []
-            initial_state = State(start[0], start[1], cum_energy=0.0, cum_time=0.0)
-            initial_state.compute_cost(energy_vs_time)
-            state_chain.append(initial_state)
-            current_state = initial_state
-
-            valid_edge_path = True
-            for i in range(1, len(path)):
-                prev_node, prev_mode = path[i - 1]
-                curr_node, curr_mode = path[i]
-
-                if L.has_edge((prev_node, prev_mode), (curr_node, curr_mode)):
-                    edge_data = L[(prev_node, prev_mode)][(curr_node, curr_mode)]
-                    edge_time = edge_data['time']
-                    edge_energy = edge_data['energy_Wh']
-                else:
-                    valid_edge_path = False
-                    break
-
-
-                battery_remaining = constants['BATTERY_CAPACITY'] - (current_state.cum_energy / constants['BATTERY_CAPACITY'] % 1) * constants['BATTERY_CAPACITY']
-
-                if edge_energy <= battery_remaining:
-                    new_cum_energy = current_state.cum_energy + edge_energy
-                    new_cum_time = current_state.cum_time + edge_time
-                    did_recharge = False
-                else:
-                    recharge_time_adjusted = (1 - battery_remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
-                    new_cum_energy = current_state.cum_energy + edge_energy
-                    new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
-                    did_recharge = True
-
-                new_state = State(curr_node, curr_mode, new_cum_energy, new_cum_time)
-                new_state.predecessor = current_state
-                new_state.did_recharge = did_recharge
-                new_state.compute_cost(energy_vs_time)
-                state_chain.append(new_state)
-                current_state = new_state
-
-            if valid_edge_path:
-                path_obj = Path(state_chain)
-                feasible_paths.append(path_obj)
+            state_chain = build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg)
+            if state_chain is not None:
+                feasible_paths.append(Path(state_chain))
 
     if dbg:
         print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
 
     return feasible_paths
-
 
 
 def analyze_paths(paths, constants):
