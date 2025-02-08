@@ -94,10 +94,11 @@ class MetaPath:
             prev_state = self.state_chain[i - 1]
             curr_state = self.state_chain[i]
 
+
             dE = curr_state.cum_energy - prev_state.cum_energy
-            # Compute the remaining battery using the helper (see below)
-            remaining_battery = constants['BATTERY_CAPACITY'] - (prev_state.cum_energy % constants['BATTERY_CAPACITY'])
-            
+
+            remaining_battery = battery_remaining(prev_state, constants)
+
             if curr_state.did_recharge:
                 recharge_time = (constants['BATTERY_CAPACITY'] - remaining_battery) / constants['BATTERY_CAPACITY'] * constants['RECHARGE_TIME']
                 self.mode_times['recharging'] = self.mode_times.get('recharging', 0) + recharge_time
@@ -123,13 +124,23 @@ class MetaPath:
 #########################################
 
 def battery_remaining(current_state, constants):
-    return constants['BATTERY_CAPACITY'] - (current_state.cum_energy % constants['BATTERY_CAPACITY'])
+    if current_state.cum_energy == 0.0:
+        return constants['BATTERY_CAPACITY']
+    elif current_state.cum_energy % constants['BATTERY_CAPACITY'] == 0:
+        return 0.0
+    else:
+        return constants['BATTERY_CAPACITY'] - (current_state.cum_energy % constants['BATTERY_CAPACITY'])
 
 
 def compute_edge_transition(current_state, edge_data, constants):
     edge_time = edge_data['time']
     edge_energy = edge_data['energy_Wh']
     remaining = battery_remaining(current_state, constants)
+
+    # Debugging: print edge energy and remaining battery.
+    # current energy and time   
+    print(f"Current state: {current_state}")
+    print(f"Remaining for travelling: {remaining}, Edge energy: {edge_energy}")
 
     if edge_energy <= remaining:
         new_cum_energy = current_state.cum_energy + edge_energy
@@ -140,6 +151,8 @@ def compute_edge_transition(current_state, edge_data, constants):
         new_cum_energy = current_state.cum_energy + edge_energy
         new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
         did_recharge = True
+
+    print(f"After edge travelling: {new_cum_energy}, {new_cum_time}, recharge: {did_recharge}")
 
     return new_cum_energy, new_cum_time, did_recharge
 
