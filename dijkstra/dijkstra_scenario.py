@@ -447,6 +447,50 @@ def build_world_graph(id=None):
         print("Built predefined scenario 1 with 8 nodes, placeholder (x,y), and computed 3D distances.")
         return G
 
+    elif id == 2:
+
+        nodes = {
+            0: (0.000000, 0.000000, 0),
+            7: (1000.000000, 1000.000000, 0),
+            6: (200.000000, 800.000000, 0),
+            2: (800.000000, 200.000000, 0),
+            1: (721.000000, 479.000000, 0),
+            3: (138.100794, 405.045027, 100),
+            4: (734.159254, 473.239449, 100),
+            5: (384.039999, 409.134085, 0)
+        }
+
+        # Define edges with terrain types and distances
+        edges = [
+            (0, 3, "slope", 439.469342),
+            (7, 1, "grass", 591.000846),
+            (7, 4, "slope", 598.454660),
+            (6, 3, "slope", 412.093367),
+            (6, 4, "slope", 634.112424),
+            (6, 5, "water", 432.026487),
+            (5, 2, "water", 465.574685),
+            (2, 1, "grass", 289.968964),
+            (1, 4, "cliff", 101.026481),
+            (3, 5, "slope", 265.523659),
+            (4, 5, "slope", 369.720151)
+        ]
+
+        # Create graph
+        G = nx.Graph()
+
+        # Add nodes with attributes
+        for node, (x, y, height) in nodes.items():
+            G.add_node(node, x=x, y=y, height=height)
+
+        # Add edges with attributes
+        for u, v, terrain, distance in edges:
+            G.add_edge(u, v, terrain=terrain, distance=distance)
+
+        # Print confirmation
+        print("Graph for scenario id == 2 has been created successfully!")
+
+        return G
+
 
 
     elif id == "straight_grass":

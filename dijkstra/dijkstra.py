@@ -34,7 +34,7 @@ CONSTANTS = {
 start = (0, 'drive')    
 goal = (7, 'drive')
 
-G_world=build_world_graph(id=None)
+G_world=build_world_graph(id=2)
 # G_world=build_world_graph(id="straight_grass")
 # G_world=build_world_graph(id="straight_water")
 # G_world=build_world_graph(id="two_slopes")
