@@ -1,6 +1,11 @@
 # %%
 
-# main_experiment.py
+%reload_ext autoreload
+%autoreload 2
+
+%matplotlib widget
+
+
 import os
 import pickle
 import math

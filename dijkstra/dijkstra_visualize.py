@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # needed for 3D projection
 import numpy as np
 from matplotlib.patches import Patch
-
+from matplotlib.lines import Line2D
 
 def short_mode_name(mode):
     return {
@@ -351,7 +351,8 @@ def plot_basic_metrics(meta_paths):
     Creates three subplots in one figure:
       - A histogram of travel times.
       - A histogram of energy consumption.
-      - A scatter plot of travel time vs. energy consumption.
+      - A scatter plot of travel time vs. energy consumption, where each point is
+        colored according to the mode in which the path spent the most time.
       
     Parameters:
       - meta_paths: List of MetaPath objects.
@@ -359,6 +360,26 @@ def plot_basic_metrics(meta_paths):
     # Extract overall metrics.
     times = [meta.total_time for meta in meta_paths]
     energies = [meta.total_energy for meta in meta_paths]
+    
+    # Define a color mapping for modes.
+    mode_colors = {
+        'fly': 'skyblue',
+        'drive': 'lightgreen',
+        'roll': 'orange',
+        'swim': 'purple',
+        'charging': 'salmon',
+        'switching': 'grey'
+    }
+    
+    # For each meta_path, determine the mode with the maximum time
+    point_colors = []
+    for meta in meta_paths:
+        if meta.mode_times:
+            dominant_mode = max(meta.mode_times, key=meta.mode_times.get)
+        else:
+            dominant_mode = None
+        # Default to blue if the dominant mode is not in our mapping.
+        point_colors.append(mode_colors.get(dominant_mode, 'blue'))
     
     # Create three subplots side-by-side.
     fig, axs = plt.subplots(1, 3, figsize=(12, 4))
@@ -375,14 +396,31 @@ def plot_basic_metrics(meta_paths):
     axs[1].set_xlabel("Energy [Wh]")
     axs[1].set_ylabel("Count")
     
-    # Scatter plot: travel time vs. energy consumption.
-    axs[2].scatter(times, energies, color='blue', alpha=0.7, edgecolors='black')
-    axs[2].set_title("Travel Time vs Energy Consumption")
+    # Scatter plot: travel time vs energy consumption,
+    # colored according to the dominant mode for each path.
+    sc = axs[2].scatter(times, energies, color=point_colors, alpha=0.7, edgecolors='none')
+    axs[2].set_title("Travel Time vs Energy Consumption\n(colored by (time-)dominant mode)")
     axs[2].set_xlabel("Travel Time [s]")
     axs[2].set_ylabel("Energy Consumption [Wh]")
     
+    # Create custom legend handles.
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w',
+            markerfacecolor=color, markersize=8, label=mode.capitalize())
+        for mode, color in mode_colors.items()
+    ]
+    axs[2].legend(
+        handles=legend_elements,
+        title="Dominant Mode",
+        loc="upper right",
+        prop={'size': 8},
+        title_fontsize=8
+    )
+
     plt.tight_layout()
     plt.show()
+
+
 
 # =============================================================================
 # Stacked Bar Charts: Breakdown per Mode.
