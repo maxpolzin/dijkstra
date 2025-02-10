@@ -1,16 +1,47 @@
 # %%
 
+    # distributions change/sensitityv w.r.t map/scenario variation
+        # add scenario for straight path on grass DONE
+        # add sceanrio for straight path on water DONE
+        # add scenario where we have to fly up a cliff (without rolling) DONE
+        # add scenario with two slopes DONE
+        
+        # 3 random ones from a maps DONE
+
+
+    # sensitivity to robot/parameter changes
+        # delta 12 parameters
+
+        # take all above scenarios, 
+        # look at the paths of the pareto front
+        # vary one parameter at a time, 
+        # see how energy, time, mode change second pareto front 
+        # makes correspondece between good paths in both runs
+
+    # sensitivity to multimodality
+        # take each scenario
+        # get the pareto points, min time and min energy, no. solutions
+        # remove each modality afterwards
+        # recalculate metrics
+        # result is a table scenario 1,2,3,4 vs. no mode
+        # no flying, no rolling, no swimming, no driving, no recharging
+
+    # can we get optimal pareto paths 0.1/0.9 for energy/cost from higher resolution grids with complex graph
+
+
+
+# %%
+
 %reload_ext autoreload
 %autoreload 2
 
 %matplotlib widget
 
-
 import os
-import pickle
 import math
 import random
 import networkx as nx
+from joblib import Memory
 
 # Imports from your modules
 from dijkstra_scenario import build_world_graph, build_layered_graph, PremadeScenarios
@@ -35,27 +66,21 @@ CONSTANTS = {
 start = (0, 'drive')
 goal = (7, 'drive')
 
-###############################################################################
-# Load (or compute) results for all scenarios
-###############################################################################
-RESULTS_FILE = "premade_scenarios_results.pkl"
+# Create a Joblib Memory object for caching.
+memory = Memory("cache_dir", verbose=0)
 
-if os.path.exists(RESULTS_FILE):
-    print("Loading results from file...")
-    with open(RESULTS_FILE, "rb") as f:
-        results = pickle.load(f)
-else:
-    print("Computing results for all premade scenarios...")
+# Now define a function to compute all scenario results and decorate it.
+@memory.cache
+def compute_all_results(modes, constants, start, goal):
     results = {}
     all_scenarios = PremadeScenarios.get_all()
     for name, graph in all_scenarios.items():
         print(f"Processing scenario: {name}")
         G_world = graph
-        L = build_layered_graph(G_world, MODES, CONSTANTS)
-        optimal_path = layered_dijkstra_with_battery(G_world, L, start, goal, MODES, CONSTANTS, energy_vs_time=0.5)
-        all_feasible_paths = find_all_feasible_paths(G_world, L, start, goal, constants=CONSTANTS)
-        meta_paths = analyze_paths(all_feasible_paths, CONSTANTS)
-        # Store all data you might later need.
+        L = build_layered_graph(G_world, modes, constants)
+        optimal_path = layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, energy_vs_time=0.5)
+        all_feasible_paths = find_all_feasible_paths(G_world, L, start, goal, constants=constants)
+        meta_paths = analyze_paths(all_feasible_paths, constants)
         results[name] = {
             "G_world": G_world,
             "L": L,
@@ -63,11 +88,10 @@ else:
             "all_feasible_paths": all_feasible_paths,
             "meta_paths": meta_paths
         }
-    print("Saving results to file...")
-    with open(RESULTS_FILE, "wb") as f:
-        pickle.dump(results, f)
+    return results
 
-#%%
+# Now, get the results (this call will load from disk if already computed).
+results = compute_all_results(MODES, CONSTANTS, start, goal)
 
 ###############################################################################
 # Visualization of a single scenario
@@ -89,6 +113,3 @@ if selected_scenario in results:
     plot_stacked_bars(meta_paths, sort_xticks_interval=10)
 else:
     print(f"Scenario {selected_scenario} not found in the results.")
-
-
-# %%
