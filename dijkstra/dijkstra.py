@@ -1,12 +1,13 @@
 # %%
-
+    
+    # DONE
     # distributions change/sensitityv w.r.t map/scenario variation
-        # add scenario for straight path on grass DONE
-        # add sceanrio for straight path on water DONE
-        # add scenario where we have to fly up a cliff (without rolling) DONE
-        # add scenario with two slopes DONE
+        # add scenario for straight path on grass
+        # add sceanrio for straight path on water
+        # add scenario where we have to fly up a cliff (without rolling)
+        # add scenario with two slopes
         
-        # 3 random ones from a maps DONE
+        # 3 random ones from a maps
 
 
     # sensitivity to robot/parameter changes
@@ -47,6 +48,8 @@ from joblib import Memory
 from dijkstra_scenario import build_world_graph, build_layered_graph, PremadeScenarios
 from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars
 from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths, analyze_paths
+
+# %%
 
 # Define your modes and constants
 MODES = {
@@ -93,6 +96,8 @@ def compute_all_results(modes, constants, start, goal):
 # Now, get the results (this call will load from disk if already computed).
 results = compute_all_results(MODES, CONSTANTS, start, goal)
 
+# %%
+
 ###############################################################################
 # Visualization of a single scenario
 ###############################################################################
@@ -113,3 +118,55 @@ if selected_scenario in results:
     plot_stacked_bars(meta_paths, sort_xticks_interval=10)
 else:
     print(f"Scenario {selected_scenario} not found in the results.")
+
+# %% 
+
+    # sensitivity to robot/parameter changes
+        # delta 12 parameters
+
+        # take all above scenarios, 
+        # look at the paths of the pareto front
+        # vary one parameter at a time, 
+        # see how energy, time, mode change second pareto front 
+        # makes correspondece between good paths in both runs
+
+
+def compute_pareto_front(meta_paths):
+    """
+    Given a list of MetaPath objects, returns the subset that forms the Pareto front,
+    i.e. the set of non-dominated meta paths with respect to total_time and total_energy.
+    
+    A meta path m is dominated if there exists another meta path n such that:
+        n.total_time <= m.total_time and n.total_energy <= m.total_energy,
+    with at least one inequality being strict.
+    """
+    pareto = []
+    for m in meta_paths:
+        dominated = False
+        for n in meta_paths:
+            if n == m:
+                continue
+            if (n.total_time <= m.total_time and n.total_energy <= m.total_energy and
+                (n.total_time < m.total_time or n.total_energy < m.total_energy)):
+                dominated = True
+                break
+        if not dominated:
+            pareto.append(m)
+    return pareto
+
+
+# Now, for each scenario in the results dictionary, compute the Pareto front.
+pareto_results = {}
+for scenario_name, data in results.items():
+    meta_paths = data["meta_paths"]
+    front = compute_pareto_front(meta_paths)
+    # Optionally, sort the Pareto front by total_time (or total_energy) for readability.
+    front_sorted = sorted(front, key=lambda m: m.total_time)
+    pareto_results[scenario_name] = front_sorted
+    print(f"Pareto front for {scenario_name}:")
+    for m in front_sorted:
+        print(f"  Time: {m.total_time:.2f} s, Energy: {m.total_energy:.2f} Wh, Mode Times: {m.mode_times}")
+
+
+
+# find paths at pareto front for each scneario.

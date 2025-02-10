@@ -3,6 +3,7 @@ import random
 import heapq
 import networkx as nx
 from collections import defaultdict
+from joblib import Parallel, delayed
 
 #########################################
 # Core Classes
@@ -248,9 +249,17 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, ene
     return Path([])
 
 
+def process_subgraph(subgraph, start, goal, L, energy_vs_time, constants, dbg):
+    feasible = []
+    for path in nx.all_simple_paths(subgraph, source=start, target=goal):
+        result = process_simple_path(path, L, energy_vs_time, constants, dbg)
+        if result is not None:
+            feasible.append(result)
+    return feasible
+
+
 def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0.0, dbg=True):
     speedup = True
-    analysed_paths = 0
     feasible_paths = []  # Will hold Path objects
 
     subgraphs = []
@@ -271,22 +280,24 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0
 
         if dbg:
             print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
-
-    # Process each simple path (with modes) found in the subgraphs.
     else:
         subgraphs = [L]
 
-    for subgraph in subgraphs:
-        for path in nx.all_simple_paths(subgraph, source=start, target=goal):
-            analysed_paths += 1
-            p = process_simple_path(path, L, energy_vs_time, constants, dbg)
-            if p is not None:
-                feasible_paths.append(p)
-
+    # Process each subgraph in parallel.
+    results = Parallel(n_jobs=-1)(
+        delayed(process_subgraph)(subgraph, start, goal, L, energy_vs_time, constants, dbg)
+        for subgraph in subgraphs
+    )
+    # Flatten the list of lists.
+    for sublist in results:
+        feasible_paths.extend(sublist)
+    
     if dbg:
+        analysed_paths = sum(len(list(nx.all_simple_paths(subgraph, source=start, target=goal))) for subgraph in subgraphs)
         print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
 
     return feasible_paths
+
 
 
 def analyze_paths(paths, constants):
