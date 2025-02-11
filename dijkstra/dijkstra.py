@@ -30,7 +30,6 @@
     # can we get optimal pareto paths 0.1/0.9 for energy/cost from higher resolution grids with complex graph
 
 
-
 # %%
 
 %reload_ext autoreload
@@ -48,6 +47,8 @@ from joblib import Memory, Parallel, delayed
 from dijkstra_scenario import build_world_graph, build_layered_graph, PremadeScenarios
 from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars
 from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths, analyze_paths
+
+
 
 # %%
 
@@ -99,54 +100,22 @@ def compute_all_results(constants, start, goal):
     results = {name: data for name, data in results_list}
     return results
 
-
 # Now, get the results (this call will load from disk if already computed).
 results = compute_all_results(CONSTANTS, start, goal)
 
+
 # %%
 
-###############################################################################
-# Visualization of a single scenario
-###############################################################################
-# For example, visualize the results for "scenario_0"
-selected_scenario = "scenario_0"
-if selected_scenario in results:
-    data = results[selected_scenario]
-    G_world = data["G_world"]
-    L = data["L"]
-    optimal_path = data["optimal_path"]
-    meta_paths = data["meta_paths"]
+# sensitivity to robot/parameter changes
+    # delta 12 parameters
 
-    visualize_world_with_multiline_3D(G_world, L, optimal_path, CONSTANTS, label_option="traveled_only")
-    print("Optimal Path:")
-    print(optimal_path)
-
-    plot_basic_metrics(meta_paths)
-    plot_stacked_bars(meta_paths, sort_xticks_interval=10)
-else:
-    print(f"Scenario {selected_scenario} not found in the results.")
-
-# %% 
-
-    # sensitivity to robot/parameter changes
-        # delta 12 parameters
-
-        # take all above scenarios, 
-        # look at the paths of the pareto front
-        # vary one parameter at a time, 
-        # see how energy, time, mode change second pareto front 
-        # makes correspondece between good paths in both runs
-
+    # take all above scenarios, 
+    # look at the paths of the pareto front
+    # vary one parameter at a time, 
+    # see how energy, time, mode change second pareto front 
+    # makes correspondece between good paths in both runs
 
 def compute_pareto_front(meta_paths):
-    """
-    Given a list of MetaPath objects, returns the subset that forms the Pareto front,
-    i.e. the set of non-dominated meta paths with respect to total_time and total_energy.
-    
-    A meta path m is dominated if there exists another meta path n such that:
-        n.total_time <= m.total_time and n.total_energy <= m.total_energy,
-    with at least one inequality being strict.
-    """
     pareto = []
     for m in meta_paths:
         dominated = False
@@ -162,7 +131,6 @@ def compute_pareto_front(meta_paths):
     return pareto
 
 
-# Now, for each scenario in the results dictionary, compute the Pareto front.
 pareto_results = {}
 for scenario_name, data in results.items():
     meta_paths = data["meta_paths"]
@@ -175,5 +143,32 @@ for scenario_name, data in results.items():
         print(f"  Time: {m.total_time:.2f} s, Energy: {m.total_energy:.2f} Wh, Mode Times: {m.mode_times}")
 
 
-
 # find paths at pareto front for each scneario.
+
+
+
+# %%
+
+###############################################################################
+# Visualization of a single scenario
+###############################################################################
+selected_scenario = "two_slopes"
+if selected_scenario in results:
+    data = results[selected_scenario]
+    G_world = data["G_world"]
+    L = data["L"]
+    optimal_path = data["optimal_path"]
+    meta_paths = data["meta_paths"]
+    pareto_front = pareto_results[selected_scenario]
+
+    # visualize_world_with_multiline_3D(G_world, L, optimal_path, CONSTANTS, label_option="traveled_only")
+    print("Optimal Path:")
+    print(optimal_path)
+
+    plot_basic_metrics(meta_paths, pareto_front)
+    # plot_stacked_bars(meta_paths, sort_xticks_interval=10)
+else:
+    print(f"Scenario {selected_scenario} not found in the results.")
+
+# %% 
+

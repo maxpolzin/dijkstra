@@ -345,14 +345,61 @@ def visualize_world_and_graph(dem, terrain, G):
 # =============================================================================
 # Basic Metrics Plot: Histograms and Scatter Plot.
 # =============================================================================
+def plot_time_histogram(times, ax):
+    """
+    Plots a histogram of travel times on the given axis.
+    """
+    ax.hist(times, bins=20, color='skyblue', edgecolor='black')
+    ax.set_title("Histogram of Travel Times")
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("Count")
 
-def plot_basic_metrics(meta_paths):
+def plot_energy_histogram(energies, ax):
+    """
+    Plots a histogram of energy consumption on the given axis.
+    """
+    ax.hist(energies, bins=20, color='salmon', edgecolor='black')
+    ax.set_title("Histogram of Energy Consumption")
+    ax.set_xlabel("Energy [Wh]")
+    ax.set_ylabel("Count")
+
+def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
+    times = np.array(times)
+    energies = np.array(energies)
+    colors = np.array(colors)
+    
+    # Plot non-Pareto points
+    non_pareto_idx = ~pareto_mask
+    if non_pareto_idx.sum() > 0:
+        ax.scatter(times[non_pareto_idx], energies[non_pareto_idx],
+                   color=colors[non_pareto_idx], alpha=0.7, edgecolors='none')
+    # Plot Pareto points with a black edge.
+    pareto_idx = pareto_mask
+    if pareto_idx.sum() > 0:
+        ax.scatter(times[pareto_idx], energies[pareto_idx],
+                   color=colors[pareto_idx], alpha=0.7, edgecolors='black', linewidths=1.5)
+    
+    ax.set_title("Travel Time vs Energy Consumption\n(colored by dominant mode)")
+    ax.set_xlabel("Travel Time [s]")
+    ax.set_ylabel("Energy Consumption [Wh]")
+    
+    # Create custom legend handles.
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w',
+               markerfacecolor=color, markersize=8, label=mode.capitalize())
+        for mode, color in mode_colors.items()
+    ]
+    ax.legend(handles=legend_elements, title="Dominant Mode\n(by time)", loc="upper right",
+              prop={'size': 8}, title_fontsize=8)
+
+def plot_basic_metrics(meta_paths, pareto_front):
     """
     Creates three subplots in one figure:
       - A histogram of travel times.
       - A histogram of energy consumption.
       - A scatter plot of travel time vs. energy consumption, where each point is
         colored according to the mode in which the path spent the most time.
+        Pareto front paths are indicated with a black edge.
       
     Parameters:
       - meta_paths: List of MetaPath objects.
@@ -367,58 +414,29 @@ def plot_basic_metrics(meta_paths):
         'drive': 'lightgreen',
         'roll': 'orange',
         'swim': 'purple',
-        'charging': 'salmon',
-        'switching': 'grey'
+        'recharging': 'black',
+        'switching': 'lightgrey'
     }
     
-    # For each meta_path, determine the mode with the maximum time
-    point_colors = []
+    # For each meta_path, determine the mode with the maximum time.
+    colors = []
     for meta in meta_paths:
-        if meta.mode_times:
-            dominant_mode = max(meta.mode_times, key=meta.mode_times.get)
-        else:
-            dominant_mode = None
-        # Default to blue if the dominant mode is not in our mapping.
-        point_colors.append(mode_colors.get(dominant_mode, 'blue'))
+        dominant_mode = max(meta.mode_times, key=meta.mode_times.get)
+        colors.append(mode_colors[dominant_mode])
+
+    # Compute Pareto front and create a boolean mask indicating Pareto points.
+    pareto_mask = np.array([meta in pareto_front for meta in meta_paths])
     
     # Create three subplots side-by-side.
     fig, axs = plt.subplots(1, 3, figsize=(12, 4))
     
-    # Histogram of travel times.
-    axs[0].hist(times, bins=20, color='skyblue', edgecolor='black')
-    axs[0].set_title("Histogram of Travel Times")
-    axs[0].set_xlabel("Time [s]")
-    axs[0].set_ylabel("Count")
+    plot_time_histogram(times, axs[0])
+    plot_energy_histogram(energies, axs[1])
+    plot_scatter_paths(times, energies, colors, pareto_mask, axs[2], mode_colors)
     
-    # Histogram of energy consumption.
-    axs[1].hist(energies, bins=20, color='salmon', edgecolor='black')
-    axs[1].set_title("Histogram of Energy Consumption")
-    axs[1].set_xlabel("Energy [Wh]")
-    axs[1].set_ylabel("Count")
-    
-    # Scatter plot: travel time vs energy consumption,
-    # colored according to the dominant mode for each path.
-    sc = axs[2].scatter(times, energies, color=point_colors, alpha=0.7, edgecolors='none')
-    axs[2].set_title("Travel Time vs Energy Consumption\n(colored by (time-)dominant mode)")
-    axs[2].set_xlabel("Travel Time [s]")
-    axs[2].set_ylabel("Energy Consumption [Wh]")
-    
-    # Create custom legend handles.
-    legend_elements = [
-        Line2D([0], [0], marker='o', color='w',
-            markerfacecolor=color, markersize=8, label=mode.capitalize())
-        for mode, color in mode_colors.items()
-    ]
-    axs[2].legend(
-        handles=legend_elements,
-        title="Dominant Mode",
-        loc="upper right",
-        prop={'size': 8},
-        title_fontsize=8
-    )
-
     plt.tight_layout()
     plt.show()
+
 
 
 
