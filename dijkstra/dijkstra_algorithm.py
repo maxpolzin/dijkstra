@@ -195,7 +195,7 @@ def process_simple_path(path, L, energy_vs_time, constants, dbg=False):
 # Algorithms: Dijkstra & All Feasible Paths
 #########################################
 
-def layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, energy_vs_time=0.0, dbg=False):
+def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_time, dbg=False):
     best_state = {}
     priority_queue = []
     
@@ -258,7 +258,7 @@ def process_subgraph(subgraph, start, goal, L, energy_vs_time, constants, dbg):
     return feasible
 
 
-def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0.0, dbg=True):
+def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, dbg=True):
     speedup = True
     feasible_paths = []  # Will hold Path objects
 
@@ -283,7 +283,7 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0
     else:
         subgraphs = [L]
 
-    # Process each subgraph in parallel.
+    # Process subgraphs in parallel.
     results = Parallel(n_jobs=-1)(
         delayed(process_subgraph)(subgraph, start, goal, L, energy_vs_time, constants, dbg)
         for subgraph in subgraphs

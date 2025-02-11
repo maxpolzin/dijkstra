@@ -42,7 +42,7 @@ import os
 import math
 import random
 import networkx as nx
-from joblib import Memory
+from joblib import Memory, Parallel, delayed
 
 # Imports from your modules
 from dijkstra_scenario import build_world_graph, build_layered_graph, PremadeScenarios
@@ -51,50 +51,57 @@ from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_
 
 # %%
 
-# Define your modes and constants
-MODES = {
-    'fly':   {'speed': 10.0,  'power': 1000.0},  # m/s, W
-    'swim':  {'speed': 0.5,  'power':   10.0},
-    'roll':  {'speed': 3.0,  'power':    1.0},
-    'drive': {'speed': 1.0,  'power':   30.0},
-}
-
 CONSTANTS = {
-    'SWITCH_TIME': 100.0,    # s time penalty for mode switch
-    'SWITCH_ENERGY': 1.0,    # Wh penalty for switching
+    'SWITCH_TIME': 100.0,    # s
+    'SWITCH_ENERGY': 1.0,    # Wh
     'BATTERY_CAPACITY': 30.0,  # Wh
     'RECHARGE_TIME': 1000.0,   # s
+    'MODES': {
+        'fly':   {'speed': 10.0,  'power': 1000.0},  # m/s, W
+        'swim':  {'speed': 0.5,  'power':   10.0},
+        'roll':  {'speed': 3.0,  'power':    1.0},
+        'drive': {'speed': 1.0,  'power':   30.0},
+    }
 }
 
 start = (0, 'drive')
 goal = (7, 'drive')
+energy_vs_time = 0.5
 
 # Create a Joblib Memory object for caching.
-memory = Memory("cache_dir", verbose=0)
+memory = Memory("cache_dir", verbose=1)
 
 # Now define a function to compute all scenario results and decorate it.
 @memory.cache
-def compute_all_results(modes, constants, start, goal):
-    results = {}
+def compute_all_results(constants, start, goal):
     all_scenarios = PremadeScenarios.get_all()
-    for name, graph in all_scenarios.items():
+    
+    def compute_for_scenario(name, graph):
         print(f"Processing scenario: {name}")
         G_world = graph
-        L = build_layered_graph(G_world, modes, constants)
-        optimal_path = layered_dijkstra_with_battery(G_world, L, start, goal, modes, constants, energy_vs_time=0.5)
-        all_feasible_paths = find_all_feasible_paths(G_world, L, start, goal, constants=constants)
+        L = build_layered_graph(G_world, constants)
+        optimal_path = layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_time=0.5)
+        all_feasible_paths = find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0.5)
         meta_paths = analyze_paths(all_feasible_paths, constants)
-        results[name] = {
+        return name, {
             "G_world": G_world,
             "L": L,
             "optimal_path": optimal_path,
             "all_feasible_paths": all_feasible_paths,
             "meta_paths": meta_paths
         }
+    
+    # Process each scenario in parallel
+    results_list = Parallel(n_jobs=-1)(
+        delayed(compute_for_scenario)(name, graph) for name, graph in all_scenarios.items()
+    )
+    # Convert list of tuples to dictionary
+    results = {name: data for name, data in results_list}
     return results
 
+
 # Now, get the results (this call will load from disk if already computed).
-results = compute_all_results(MODES, CONSTANTS, start, goal)
+results = compute_all_results(CONSTANTS, start, goal)
 
 # %%
 

@@ -575,7 +575,9 @@ def exceeds_battery_capacity(energy_wh, battery_capacity):
     return energy_wh > battery_capacity
 
 
-def build_layered_graph(G_world, modes, constants):
+def build_layered_graph(G_world, constants):
+    modes = constants['MODES']
+    
     L = nx.DiGraph()
     modes_list = list(modes.keys())
     
