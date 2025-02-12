@@ -38,6 +38,7 @@
 %matplotlib widget
 
 import os
+import copy
 import math
 import random
 import networkx as nx
@@ -45,12 +46,45 @@ from joblib import Memory, Parallel, delayed
 
 # Imports from your modules
 from dijkstra_scenario import build_world_graph, build_layered_graph, PremadeScenarios
-from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars
-from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths, analyze_paths
+from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths, analyze_paths, compute_pareto_front
 
 
 
 # %%
+
+
+class SensitivityConstants:
+    def __init__(self, constants, variation=0.2):
+        self.constants = constants
+        self.variation = variation
+
+    def __iter__(self):
+        # Yield baseline as a deep copy.
+        baseline = copy.deepcopy(self.constants)
+        yield baseline
+        
+        # Recursively collect all paths to numeric parameters.
+        numeric_paths = []
+        def traverse(d, path):
+            for key, value in d.items():
+                if isinstance(value, (int, float)):
+                    numeric_paths.append(path + [key])
+                elif isinstance(value, dict):
+                    traverse(value, path + [key])
+        traverse(self.constants, [])
+        
+        # For each numeric parameter, yield two variations: +variation and -variation.
+        for path in numeric_paths:
+            for factor in [1 + self.variation, 1 - self.variation]:
+                new_constants = copy.deepcopy(self.constants)
+                # Navigate to the value to be modified.
+                d = new_constants
+                for key in path[:-1]:
+                    d = d[key]
+                d[path[-1]] *= factor
+                yield new_constants
+
+
 
 CONSTANTS = {
     'SWITCH_TIME': 100.0,    # s
@@ -65,43 +99,65 @@ CONSTANTS = {
     }
 }
 
-start = (0, 'drive')
-goal = (7, 'drive')
-energy_vs_time = 0.5
+
+# print("Parameter variations: ")
+# for idx, const in enumerate(SensitivityConstants(CONSTANTS)):
+#     print(f"Variation {idx}: {const}")
+
+# print("-" * 40)
+    
+
+# %%
+
+START = (0, 'drive')
+GOAL = (7, 'drive')
+ENERGY_VS_TIME = 0.5
 
 # Create a Joblib Memory object for caching.
 memory = Memory("cache_dir", verbose=1)
 
-# Now define a function to compute all scenario results and decorate it.
-@memory.cache
-def compute_all_results(constants, start, goal):
-    all_scenarios = PremadeScenarios.get_all()
-    
-    def compute_for_scenario(name, graph):
-        print(f"Processing scenario: {name}")
-        G_world = graph
-        L = build_layered_graph(G_world, constants)
-        optimal_path = layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_time=0.5)
-        all_feasible_paths = find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=0.5)
-        meta_paths = analyze_paths(all_feasible_paths, constants)
-        return name, {
-            "G_world": G_world,
-            "L": L,
-            "optimal_path": optimal_path,
-            "all_feasible_paths": all_feasible_paths,
-            "meta_paths": meta_paths
-        }
-    
-    # Process each scenario in parallel
-    results_list = Parallel(n_jobs=-1)(
-        delayed(compute_for_scenario)(name, graph) for name, graph in all_scenarios.items()
-    )
-    # Convert list of tuples to dictionary
-    results = {name: data for name, data in results_list}
-    return results
 
-# Now, get the results (this call will load from disk if already computed).
-results = compute_all_results(CONSTANTS, start, goal)
+all_scenarios = PremadeScenarios.get_all()
+
+@memory.cache
+def compute_for_scenario(name, graph, constants):
+    print(f"Processing scenario: {name} with constants: {constants}")
+    G_world = graph
+    L = build_layered_graph(G_world, constants)
+    optimal_path = layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_time=energy_vs_time)
+    all_feasible_paths = find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=energy_vs_time)
+    meta_paths = analyze_paths(all_feasible_paths, constants)
+    pareto_front = compute_pareto_front(meta_paths)   
+    return name, {
+        "G_world": G_world,
+        "L": L,
+        "optimal_path": optimal_path,
+        "all_feasible_paths": all_feasible_paths,
+        "meta_paths": meta_paths,
+        "pareto_front": pareto_front
+    }
+
+all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))[0:4]
+all_results = {}
+
+for idx, var_constants in enumerate(all_variations):
+    print(f"\n--- Processing parameter variation {idx} ---")
+
+    results_list = Parallel(n_jobs=-1)(
+        delayed(compute_for_scenario)(name, graph, constants=var_constants)
+        for name, graph in all_scenarios.items()
+    )
+
+    scenario_results = {name: data for name, data in results_list}
+
+    all_results[idx] = {
+        "constants": var_constants,
+        "results": scenario_results
+    }
+
+
+
+
 
 
 # %%
@@ -115,60 +171,47 @@ results = compute_all_results(CONSTANTS, start, goal)
     # see how energy, time, mode change second pareto front 
     # makes correspondece between good paths in both runs
 
-def compute_pareto_front(meta_paths):
-    pareto = []
-    for m in meta_paths:
-        dominated = False
-        for n in meta_paths:
-            if n == m:
-                continue
-            if (n.total_time <= m.total_time and n.total_energy <= m.total_energy and
-                (n.total_time < m.total_time or n.total_energy < m.total_energy)):
-                dominated = True
-                break
-        if not dominated:
-            pareto.append(m)
-    return pareto
-
-
-pareto_results = {}
-for scenario_name, data in results.items():
-    meta_paths = data["meta_paths"]
-    front = compute_pareto_front(meta_paths)
-    # Optionally, sort the Pareto front by total_time (or total_energy) for readability.
-    front_sorted = sorted(front, key=lambda m: m.total_time)
-    pareto_results[scenario_name] = front_sorted
-    print(f"Pareto front for {scenario_name}:")
-    for m in front_sorted:
-        print(f"  Time: {m.total_time:.2f} s, Energy: {m.total_energy:.2f} Wh, Mode Times: {m.mode_times}")
-
-
-# find paths at pareto front for each scneario.
-
 
 
 # %%
 
+from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars, visualize_param_variations
+
+
 ###############################################################################
-# Visualization of a single scenario
+# Visualization of a single scenario for single parameter variation
 ###############################################################################
-selected_scenario = "two_slopes"
-if selected_scenario in results:
-    data = results[selected_scenario]
+selected_variation = 3  # baseline variation
+selected_scenario = "straight_water"
+if selected_scenario in all_results[selected_variation]["results"]:
+    constants = all_results[selected_variation]["constants"]
+    data = all_results[selected_variation]["results"][selected_scenario]
     G_world = data["G_world"]
     L = data["L"]
     optimal_path = data["optimal_path"]
     meta_paths = data["meta_paths"]
-    pareto_front = pareto_results[selected_scenario]
+    pareto_front = data["pareto_front"]
 
-    # visualize_world_with_multiline_3D(G_world, L, optimal_path, CONSTANTS, label_option="traveled_only")
+    # For example, visualize metrics for baseline:
+    visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="traveled_only")
     print("Optimal Path:")
     print(optimal_path)
-
     plot_basic_metrics(meta_paths, pareto_front)
-    # plot_stacked_bars(meta_paths, sort_xticks_interval=10)
 else:
-    print(f"Scenario {selected_scenario} not found in the results.")
+    print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
+
+
+###############################################################################
+# Visualization of parameter variations for a single scenario
+###############################################################################
+
+
+selected_scenario = "straight_water"
+
+scenario_results = {var: all_results[var]["results"][selected_scenario] 
+                    for var in all_results if selected_scenario in all_results[var]["results"]}
+                    
+visualize_param_variations(scenario_results)
 
 # %% 
 

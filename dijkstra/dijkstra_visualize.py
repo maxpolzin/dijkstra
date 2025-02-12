@@ -392,6 +392,63 @@ def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
     ax.legend(handles=legend_elements, title="Dominant Mode\n(by time)", loc="upper right",
               prop={'size': 8}, title_fontsize=8)
 
+
+def visualize_param_variations(scenario_results, n_cols=3):
+    mode_colors = {
+        'fly': 'skyblue',
+        'drive': 'lightgreen',
+        'roll': 'orange',
+        'swim': 'purple',
+        'recharging': 'black',
+        'switching': 'lightgrey'
+    }
+
+    # Get sorted variation indices.
+    variation_keys = sorted(scenario_results.keys())
+    n_variations = len(variation_keys)
+    n_rows = int(np.ceil(n_variations / n_cols))
+    
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(n_cols * 5, n_rows * 4))
+    axs = np.array(axs).flatten()
+    
+    for idx, var in enumerate(variation_keys):
+        ax = axs[idx]
+        data = scenario_results[var]
+        meta_paths = data["meta_paths"]
+        pareto_front = data["pareto_front"]
+        
+        # Extract overall metrics.
+        times = [m.total_time for m in meta_paths]
+        energies = [m.total_energy for m in meta_paths]
+        
+        # Determine dominant mode color for each meta path.
+        colors = []
+        for meta in meta_paths:
+            if meta.mode_times:
+                dominant_mode = max(meta.mode_times, key=meta.mode_times.get)
+                colors.append(mode_colors.get(dominant_mode, 'blue'))
+            else:
+                colors.append('blue')
+        
+        # Create a Boolean mask for Pareto points.
+        pareto_mask = np.array([m in pareto_front for m in meta_paths])
+        
+        # Reuse your plot_scatter_paths function.
+        plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors)
+        
+        # Set a title indicating the variation index and one key parameter, e.g., RECHARGE_TIME.
+        var_constants = data.get("constants", {})
+        rt = var_constants.get("RECHARGE_TIME", "N/A")
+        ax.set_title(f"Var {var}\nRECHARGE_TIME: {rt}")
+    
+    # Remove any unused axes.
+    for j in range(idx + 1, len(axs)):
+        fig.delaxes(axs[j])
+    
+    plt.tight_layout()
+    plt.show()
+
+
 def plot_basic_metrics(meta_paths, pareto_front):
     """
     Creates three subplots in one figure:

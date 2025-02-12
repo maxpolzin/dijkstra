@@ -539,9 +539,9 @@ class PremadeScenarios:
             # "scenario_1": cls.scenario_1(),
             # "scenario_2": cls.scenario_2(),
             # "straight_grass": cls.straight_grass(),
-            # "straight_water": cls.straight_water(),
-            # "fly_up_cliff": cls.fly_up_cliff(),
-            "two_slopes": cls.two_slopes(),
+            "straight_water": cls.straight_water(),
+            "fly_up_cliff": cls.fly_up_cliff(),
+            # "two_slopes": cls.two_slopes(),
         }
 
 
