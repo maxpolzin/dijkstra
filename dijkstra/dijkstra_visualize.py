@@ -392,8 +392,8 @@ def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
     ax.legend(handles=legend_elements, title="Dominant Mode\n(by time)", loc="upper right",
               prop={'size': 8}, title_fontsize=8)
 
-
-def visualize_param_variations(scenario_results, n_cols=3):
+def visualize_param_variations(all_results, selected_scenario, n_cols=3):
+    # Define a color mapping for modes.
     mode_colors = {
         'fly': 'skyblue',
         'drive': 'lightgreen',
@@ -402,20 +402,44 @@ def visualize_param_variations(scenario_results, n_cols=3):
         'recharging': 'black',
         'switching': 'lightgrey'
     }
-
-    # Get sorted variation indices.
-    variation_keys = sorted(scenario_results.keys())
+    
+    # Collect all variation keys that contain the selected scenario.
+    variation_keys = sorted([k for k, v in all_results.items() if selected_scenario in v["results"]])
     n_variations = len(variation_keys)
+    if n_variations == 0:
+        print(f"Scenario {selected_scenario} not found in any variation.")
+        return
     n_rows = int(np.ceil(n_variations / n_cols))
     
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(n_cols * 5, n_rows * 4))
+    # First pass: compute global x and y limits across all variations.
+    all_times = []
+    all_energies = []
+    for var in variation_keys:
+        data = all_results[var]["results"][selected_scenario]
+        meta_paths = data["meta_paths"]
+        times = [m.total_time for m in meta_paths]
+        energies = [m.total_energy for m in meta_paths]
+        all_times.extend(times)
+        all_energies.extend(energies)
+    # Compute global limits with a small margin.
+    x_min, x_max = min(all_times), max(all_times)
+    y_min, y_max = min(all_energies), max(all_energies)
+    x_margin = 0.05 * (x_max - x_min) if x_max > x_min else 1
+    y_margin = 0.05 * (y_max - y_min) if y_max > y_min else 1
+    global_xlim = (x_min - x_margin, x_max + x_margin)
+    global_ylim = (y_min - y_margin, y_max + y_margin)
+    
+    # Create subplots.
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(n_cols * 4, n_rows * 4))
     axs = np.array(axs).flatten()
     
     for idx, var in enumerate(variation_keys):
         ax = axs[idx]
-        data = scenario_results[var]
+        data = all_results[var]["results"][selected_scenario]
+        var_constants = all_results[var]["constants"]
         meta_paths = data["meta_paths"]
         pareto_front = data["pareto_front"]
+        optimal_path = data["optimal_path"]
         
         # Extract overall metrics.
         times = [m.total_time for m in meta_paths]
@@ -433,13 +457,22 @@ def visualize_param_variations(scenario_results, n_cols=3):
         # Create a Boolean mask for Pareto points.
         pareto_mask = np.array([m in pareto_front for m in meta_paths])
         
-        # Reuse your plot_scatter_paths function.
+        # Plot scatter using your plot_scatter_paths helper.
         plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors)
         
-        # Set a title indicating the variation index and one key parameter, e.g., RECHARGE_TIME.
-        var_constants = data.get("constants", {})
-        rt = var_constants.get("RECHARGE_TIME", "N/A")
-        ax.set_title(f"Var {var}\nRECHARGE_TIME: {rt}")
+        # Remove legend for all but the first subplot.
+        if idx != 0:
+            leg = ax.get_legend()
+            if leg is not None:
+                leg.remove()
+        
+        # Set consistent x and y limits.
+        ax.set_xlim(global_xlim)
+        ax.set_ylim(global_ylim)
+        
+        # Set a title showing variation index and optimal path stats.
+        title = (f"Var {var} - Optimal: {optimal_path.total_time:.2f}s, {optimal_path.total_energy:.2f}Wh")
+        ax.set_title(title)
     
     # Remove any unused axes.
     for j in range(idx + 1, len(axs)):
@@ -447,6 +480,8 @@ def visualize_param_variations(scenario_results, n_cols=3):
     
     plt.tight_layout()
     plt.show()
+
+
 
 
 def plot_basic_metrics(meta_paths, pareto_front):

@@ -52,7 +52,6 @@ from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_
 
 # %%
 
-
 class SensitivityConstants:
     def __init__(self, constants, variation=0.2):
         self.constants = constants
@@ -85,7 +84,6 @@ class SensitivityConstants:
                 yield new_constants
 
 
-
 CONSTANTS = {
     'SWITCH_TIME': 100.0,    # s
     'SWITCH_ENERGY': 1.0,    # Wh
@@ -98,7 +96,6 @@ CONSTANTS = {
         'drive': {'speed': 1.0,  'power':   30.0},
     }
 }
-
 
 # print("Parameter variations: ")
 # for idx, const in enumerate(SensitivityConstants(CONSTANTS)):
@@ -115,9 +112,6 @@ ENERGY_VS_TIME = 0.5
 
 # Create a Joblib Memory object for caching.
 memory = Memory("cache_dir", verbose=1)
-
-
-all_scenarios = PremadeScenarios.get_all()
 
 @memory.cache
 def compute_for_scenario(name, graph, constants):
@@ -137,6 +131,8 @@ def compute_for_scenario(name, graph, constants):
         "pareto_front": pareto_front
     }
 
+
+all_scenarios = PremadeScenarios.get_all()
 all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))[0:4]
 all_results = {}
 
@@ -156,10 +152,6 @@ for idx, var_constants in enumerate(all_variations):
     }
 
 
-
-
-
-
 # %%
 
 # sensitivity to robot/parameter changes
@@ -171,9 +163,6 @@ for idx, var_constants in enumerate(all_variations):
     # see how energy, time, mode change second pareto front 
     # makes correspondece between good paths in both runs
 
-
-
-# %%
 
 from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars, visualize_param_variations
 
@@ -205,13 +194,8 @@ else:
 # Visualization of parameter variations for a single scenario
 ###############################################################################
 
-
 selected_scenario = "straight_water"
-
-scenario_results = {var: all_results[var]["results"][selected_scenario] 
-                    for var in all_results if selected_scenario in all_results[var]["results"]}
-                    
-visualize_param_variations(scenario_results)
+visualize_param_variations(all_results, selected_scenario)
 
 # %% 
 
