@@ -3,7 +3,6 @@ import random
 import heapq
 import networkx as nx
 from collections import defaultdict
-from joblib import Parallel, delayed
 
 import time
 import functools
@@ -287,10 +286,10 @@ def process_subgraph(subgraph, start, goal, L, energy_vs_time, constants, dbg):
     if dbg:
         print(f"Processing {len(candidate_paths)} paths in subgraph.")
 
-    results = Parallel(n_jobs=-1)(
-        delayed(process_simple_path)(path, L, energy_vs_time, constants, dbg) 
-        for path in candidate_paths
-    )
+    results = []
+    for path in candidate_paths:
+        result = process_simple_path(path, L, energy_vs_time, constants, dbg)
+        results.append(result)
 
     feasible = [r for r in results if r is not None]
     return feasible
@@ -322,11 +321,9 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, 
     else:
         subgraphs = [L]
 
-    # Process subgraphs in parallel.
-    results = Parallel(n_jobs=-1)(
-        delayed(process_subgraph)(subgraph, start, goal, L, energy_vs_time, constants, dbg)
-        for subgraph in subgraphs
-    )
+    results = []
+    for subgraph in subgraphs:
+        results.append(process_subgraph(subgraph, start, goal, L, energy_vs_time, constants, dbg))
 
     # Flatten the list of lists.
     for sublist in results:
@@ -340,7 +337,7 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, 
 
 
 def analyze_paths(paths, constants):
-    meta_list = Parallel(n_jobs=-1)(
-        delayed(MetaPath)(p, constants) for p in paths
-    )
+    meta_list = []
+    for p in paths:
+        meta_list.append(MetaPath(p, constants))
     return meta_list

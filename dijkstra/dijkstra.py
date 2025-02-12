@@ -118,8 +118,8 @@ def compute_for_scenario(name, graph, constants):
     print(f"Processing scenario: {name} with constants: {constants}")
     G_world = graph
     L = build_layered_graph(G_world, constants)
-    optimal_path = layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_time=energy_vs_time)
-    all_feasible_paths = find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time=energy_vs_time)
+    optimal_path = layered_dijkstra_with_battery(G_world, L, START, GOAL, constants, energy_vs_time=ENERGY_VS_TIME)
+    all_feasible_paths = find_all_feasible_paths(G_world, L, START, GOAL, constants, energy_vs_time=ENERGY_VS_TIME)
     meta_paths = analyze_paths(all_feasible_paths, constants)
     pareto_front = compute_pareto_front(meta_paths)   
     return name, {
@@ -133,23 +133,28 @@ def compute_for_scenario(name, graph, constants):
 
 
 all_scenarios = PremadeScenarios.get_all()
-all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))[0:4]
+all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
 all_results = {}
 
-for idx, var_constants in enumerate(all_variations):
+def process_variation(idx, var_constants):
     print(f"\n--- Processing parameter variation {idx} ---")
-
-    results_list = Parallel(n_jobs=-1)(
-        delayed(compute_for_scenario)(name, graph, constants=var_constants)
-        for name, graph in all_scenarios.items()
-    )
+    
+    results_list = []
+    for name, graph in all_scenarios.items():
+        results_list.append(compute_for_scenario(name, graph, constants=var_constants))
 
     scenario_results = {name: data for name, data in results_list}
+    return idx, {"constants": var_constants, "results": scenario_results}
 
-    all_results[idx] = {
-        "constants": var_constants,
-        "results": scenario_results
-    }
+# Assume all_variations is a list of all parameter variations from SensitivityConstants.
+all_results_list = Parallel(n_jobs=-1)(
+    delayed(process_variation)(idx, var_constants)
+    for idx, var_constants in enumerate(all_variations)
+)
+
+# Convert the list of tuples into a dictionary keyed by variation index.
+all_results = {idx: data for idx, data in all_results_list}
+
 
 
 # %%
