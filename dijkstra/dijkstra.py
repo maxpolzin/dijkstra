@@ -88,7 +88,7 @@ CONSTANTS = {
     'SWITCH_TIME': 100.0,    # s
     'SWITCH_ENERGY': 1.0,    # Wh
     'BATTERY_CAPACITY': 30.0,  # Wh
-    'RECHARGE_TIME': 1000.0,   # s
+    'RECHARGE_TIME': 30000.0,   # s or 30000
     'MODES': {
         'fly':   {'speed': 10.0,  'power': 1000.0},  # m/s, W
         'swim':  {'speed': 0.5,  'power':   10.0},
@@ -136,8 +136,7 @@ import pickle
 from dijkstra_scenario import build_world_graph, build_layered_graph, PremadeScenarios
 
 all_scenarios = PremadeScenarios.get_all()
-# all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
-all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))[0:16]
+all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
 
 
 def process_variation(idx, var_constants):
@@ -149,6 +148,7 @@ def process_variation(idx, var_constants):
 
     scenario_results = {name: data for name, data in results_list}
     return idx, {"constants": var_constants, "results": scenario_results}
+
 
 
 recompute = True
@@ -178,7 +178,7 @@ else:
 
 # For singel example scneario
 
-# name = "straight_grass"
+# name = "scenario_2"
 # graph = all_scenarios[name]
 # var_constants = all_variations[0]
 
@@ -191,16 +191,6 @@ else:
 
 
 # %%
-
-# sensitivity to robot/parameter changes
-    # delta 12 parameters
-
-    # take all above scenarios, 
-    # look at the paths of the pareto front
-    # vary one parameter at a time, 
-    # see how energy, time, mode change second pareto front 
-    # makes correspondece between good paths in both runs
-
 
 ###############################################################################
 # Visualization of parameter variations for a single scenario

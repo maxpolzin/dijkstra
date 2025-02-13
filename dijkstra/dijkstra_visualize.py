@@ -438,7 +438,7 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
     global_ylim = (y_min - y_margin, y_max + y_margin)
     
     # Create subplots.
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(n_cols * 4, n_rows * 4))
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(n_cols * 4, n_rows * 4), sharex=True, sharey=True)
     axs = np.array(axs).flatten()
     
     for idx, var in enumerate(variation_keys):
@@ -457,7 +457,12 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
         colors = []
         for meta in meta_paths:
             if meta.mode_times:
-                dominant_mode = max(meta.mode_times, key=meta.mode_times.get)
+                # Filter out the 'recharging' mode before determining the dominant mode.
+                filtered_mode_times = {mode: t for mode, t in meta.mode_times.items() if mode != 'recharging'}
+                if filtered_mode_times:
+                    dominant_mode = max(filtered_mode_times, key=filtered_mode_times.get)
+                else:
+                    dominant_mode = None
                 colors.append(mode_colors.get(dominant_mode, 'blue'))
             else:
                 colors.append('blue')
