@@ -46,6 +46,7 @@ from joblib import Memory, Parallel, delayed
 
 # Imports from your modules
 from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths, analyze_paths, compute_pareto_front
+from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars, visualize_param_variations
 
 
 
@@ -87,7 +88,7 @@ CONSTANTS = {
     'SWITCH_TIME': 100.0,    # s
     'SWITCH_ENERGY': 1.0,    # Wh
     'BATTERY_CAPACITY': 30.0,  # Wh
-    'RECHARGE_TIME': 30000.0,   # s
+    'RECHARGE_TIME': 1000.0,   # s
     'MODES': {
         'fly':   {'speed': 10.0,  'power': 1000.0},  # m/s, W
         'swim':  {'speed': 0.5,  'power':   10.0},
@@ -173,6 +174,9 @@ else:
 
 
 
+# %%
+
+# For singel example scneario
 
 # name = "straight_grass"
 # graph = all_scenarios[name]
@@ -186,6 +190,7 @@ else:
 
 
 
+# %%
 
 # sensitivity to robot/parameter changes
     # delta 12 parameters
@@ -197,14 +202,23 @@ else:
     # makes correspondece between good paths in both runs
 
 
-from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars, visualize_param_variations
+###############################################################################
+# Visualization of parameter variations for a single scenario
+###############################################################################
+for scenario in all_scenarios:
+    print(f"Scenario: {scenario}")
+    visualize_param_variations(all_results, scenario)
 
+
+
+
+# %% 
 
 ###############################################################################
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
 selected_variation = 0
-selected_scenario = "scenario_0"
+selected_scenario = "scenario_1"
 if selected_scenario in all_results[selected_variation]["results"]:
     constants = all_results[selected_variation]["constants"]
     data = all_results[selected_variation]["results"][selected_scenario]
@@ -223,16 +237,3 @@ if selected_scenario in all_results[selected_variation]["results"]:
     # plot_basic_metrics(meta_paths, pareto_front)
 else:
     print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
-
-
-
-
-
-###############################################################################
-# Visualization of parameter variations for a single scenario
-###############################################################################
-
-visualize_param_variations(all_results, selected_scenario)
-
-# %% 
-
