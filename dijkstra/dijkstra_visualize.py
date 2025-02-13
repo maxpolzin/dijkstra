@@ -460,6 +460,9 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
         # Plot scatter using your plot_scatter_paths helper.
         plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors)
         
+        # Show cost_optimal path
+        ax.scatter(optimal_path.total_time, optimal_path.total_energy, marker='X', s=100, color='black', zorder=10)
+
         # Remove legend for all but the first subplot.
         if idx != 0:
             leg = ax.get_legend()

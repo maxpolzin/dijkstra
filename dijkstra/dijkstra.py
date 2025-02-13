@@ -32,10 +32,10 @@
 
 # %%
 
-%reload_ext autoreload
-%autoreload 2
+# %reload_ext autoreload
+# %autoreload 2
 
-%matplotlib widget
+# %matplotlib widget
 
 import os
 import copy
@@ -45,7 +45,6 @@ import networkx as nx
 from joblib import Memory, Parallel, delayed
 
 # Imports from your modules
-from dijkstra_scenario import build_world_graph, build_layered_graph, PremadeScenarios
 from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths, analyze_paths, compute_pareto_front
 
 
@@ -104,8 +103,6 @@ CONSTANTS = {
 # print("-" * 40)
     
 
-# %%
-
 START = (0, 'drive')
 GOAL = (7, 'drive')
 ENERGY_VS_TIME = 0.5
@@ -132,9 +129,13 @@ def compute_for_scenario(name, graph, constants):
     }
 
 
+# %%
+
+import pickle
+from dijkstra_scenario import build_world_graph, build_layered_graph, PremadeScenarios
+
 all_scenarios = PremadeScenarios.get_all()
 all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
-all_results = {}
 
 def process_variation(idx, var_constants):
     print(f"\n--- Processing parameter variation {idx} ---")
@@ -146,14 +147,34 @@ def process_variation(idx, var_constants):
     scenario_results = {name: data for name, data in results_list}
     return idx, {"constants": var_constants, "results": scenario_results}
 
-# Assume all_variations is a list of all parameter variations from SensitivityConstants.
-all_results_list = Parallel(n_jobs=-1)(
-    delayed(process_variation)(idx, var_constants)
-    for idx, var_constants in enumerate(all_variations)
-)
 
-# Convert the list of tuples into a dictionary keyed by variation index.
-all_results = {idx: data for idx, data in all_results_list}
+pickle_file = "all_results.pkl"
+
+if os.path.exists(pickle_file):
+    print("Loading all_results from pickle file...")
+    with open(pickle_file, "rb") as f:
+        all_results = pickle.load(f)
+else:
+    print("Computing all_results...")
+   
+    all_results_list = Parallel(n_jobs=-1)(
+        delayed(process_variation)(idx, var_constants)
+        for idx, var_constants in enumerate(all_variations)
+    )
+    # all_results_list = []
+    # for idx, var_constants in enumerate(all_variations):
+    #     all_results_list.append(process_variation(idx,var_constants))
+   
+    # Convert the list of tuples into a dictionary keyed by variation index.
+    all_results = {idx: data for idx, data in all_results_list}
+
+    # Save to pickle file.
+    with open(pickle_file, "wb") as f:
+        pickle.dump(all_results, f)
+    print("Computed and saved all_results.")
+
+
+
 
 
 
@@ -175,8 +196,8 @@ from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_met
 ###############################################################################
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
-selected_variation = 3  # baseline variation
-selected_scenario = "straight_water"
+selected_variation = 0
+selected_scenario = "straight_grass"
 if selected_scenario in all_results[selected_variation]["results"]:
     constants = all_results[selected_variation]["constants"]
     data = all_results[selected_variation]["results"][selected_scenario]
@@ -195,11 +216,21 @@ else:
     print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
 
 
+# "scenario_0": cls.scenario_0(),
+# "scenario_1": cls.scenario_1(),
+# # "scenario_2": cls.scenario_2(),
+# "straight_grass": cls.straight_grass(),
+# "straight_water": cls.straight_water(),
+# "fly_up_cliff": cls.fly_up_cliff(),
+# "two_slopes": cls.two_slopes(),
+
+# %%
+ 
 ###############################################################################
 # Visualization of parameter variations for a single scenario
 ###############################################################################
 
-selected_scenario = "straight_water"
+selected_scenario = "scenario_0"
 visualize_param_variations(all_results, selected_scenario)
 
 # %% 
