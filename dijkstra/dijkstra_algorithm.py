@@ -31,6 +31,7 @@ class State:
         self.cost = None
         self.predecessor = None
         self.did_recharge = False
+        self.recharge_time = 0.0  # New attribute to store recharge duration
 
     def compute_cost(self, energy_vs_time):
         self.cost = (1 - energy_vs_time) * self.cum_time + energy_vs_time * self.cum_energy
@@ -42,7 +43,6 @@ class State:
     def __repr__(self):
         return (f"State(node={self.node}, mode={self.mode}, cum_energy={self.cum_energy:.2f}, "
                 f"cum_time={self.cum_time:.2f}, cost={self.cost:.2f})")
-
 
 class Path:
     def __init__(self, state_chain):
@@ -105,22 +105,26 @@ class Path:
             if state.predecessor is not None and state.mode != state.predecessor.mode:
                 note = f"Switched from {state.predecessor.mode} to {state.mode}"
             
-            # If this state is the result of a recharge, append that information.
+            # If this state is the result of a recharge, split the seg. time.
             if state.did_recharge:
-                # If there is already a note, separate with a semicolon.
+                # travel_time is the edge travel time (excluding recharge)
+                travel_time = seg_time - state.recharge_time
+                seg_time_str = f"{travel_time:.1f}+{state.recharge_time:.1f}"
                 if note:
                     note += "; "
-                note += f"Recharged for {seg_time:.2f}s"
+                note += f"Recharged for {state.recharge_time:.0f}s"
+            else:
+                seg_time_str = f"{seg_time:.1f}"
             
             result += (f"{i:7d} | {state.node:>4} | {state.mode:>6} | "
-                    f"{seg_time:12.2f} | {seg_energy:16.2f} | "
+                    f"{seg_time_str:>12} | {seg_energy:16.2f} | "
                     f"{state.cum_time:12.2f} | {state.cum_energy:16.2f} | {note:>30}\n")
         
         result += "\n"
-        result += f"Switch nodes (IDs): {self.switch_nodes}\n"
-        result += "Recharge events (node, mode): " + ", ".join(str(r) for r in self.recharge_events) + "\n"
-        result += f"Total travel time: {self.total_time:.1f} s\n"
-        result += f"Total energy consumption: {self.total_energy:.3f} Wh\n"
+        # result += f"Switch nodes (IDs): {self.switch_nodes}\n"
+        # result += "Recharge events (node, mode): " + ", ".join(str(r) for r in self.recharge_events) + "\n"
+        # result += f"Total travel time: {self.total_time:.1f} s\n"
+        # result += f"Total energy consumption: {self.total_energy:.3f} Wh\n"
         return result
 
 
@@ -191,14 +195,15 @@ def compute_edge_transition(current_state, edge_data, constants):
         new_cum_energy = current_state.cum_energy + edge_energy
         new_cum_time = current_state.cum_time + edge_time
         did_recharge = False
+        recharge_time = 0.0
     else:
         recharge_time_adjusted = (1 - remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
         new_cum_energy = current_state.cum_energy + edge_energy
         new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
         did_recharge = True
+        recharge_time = recharge_time_adjusted
 
-    return new_cum_energy, new_cum_time, did_recharge
-
+    return new_cum_energy, new_cum_time, did_recharge, recharge_time
 
 def build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg=False):
     state_chain = []
@@ -219,10 +224,11 @@ def build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg=F
             return None
 
         edge_data = L[prev_tuple][curr_tuple]
-        new_cum_energy, new_cum_time, did_recharge = compute_edge_transition(current_state, edge_data, constants)
+        new_cum_energy, new_cum_time, did_recharge, recharge_time = compute_edge_transition(current_state, edge_data, constants)
         new_state = State(curr_tuple[0], curr_tuple[1], new_cum_energy, new_cum_time)
         new_state.predecessor = current_state
         new_state.did_recharge = did_recharge
+        new_state.recharge_time = recharge_time
         new_state.compute_cost(energy_vs_time)
         state_chain.append(new_state)
         current_state = new_state
@@ -288,12 +294,14 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_
         
         for neighbor in L.successors((current_state.node, current_state.mode)):
             edge = L[(current_state.node, current_state.mode)][neighbor]
-            neighbor_node, neighbor_mode = neighbor        
-            new_cum_energy, new_cum_time, did_recharge = compute_edge_transition(current_state, edge, constants)
+            neighbor_node, neighbor_mode = neighbor
+            # Updated: Unpack the extra value recharge_time.
+            new_cum_energy, new_cum_time, did_recharge, recharge_time = compute_edge_transition(current_state, edge, constants)
             
             new_state = State(neighbor_node, neighbor_mode, new_cum_energy, new_cum_time)
             new_state.predecessor = current_state
             new_state.did_recharge = did_recharge
+            new_state.recharge_time = recharge_time  # Record the recharge duration.
             new_state.compute_cost(energy_vs_time)
             
             # Check if new_state is dominated by any state already in best_states for this key.
@@ -358,7 +366,7 @@ def process_subgraph(subgraph, start, goal, L, energy_vs_time, constants, dbg):
 
 
 
-def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, dbg=True):
+def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, dbg=False):
     speedup = True
     feasible_paths = []  # Will hold Path objects
 

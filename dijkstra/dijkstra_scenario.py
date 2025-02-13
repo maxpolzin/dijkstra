@@ -417,13 +417,13 @@ class PremadeScenarios:
         G = nx.Graph()
         nodes = {
             0: (0, 0, 0),
-            1: (430, 0, 0),
-            2: (860, 0, 0),
-            3: (1290, 0, 0),
-            4: (1720, 0, 0),
-            5: (2150, 0, 0),
-            6: (2580, 0, 0),
-            7: (3010, 0, 0)
+            1: (250, 0, 0),
+            2: (500, 0, 0),
+            3: (750, 0, 0),
+            4: (1000, 0, 0),
+            5: (1250, 0, 0),
+            6: (1500, 0, 0),
+            7: (1750, 0, 0)
         }
         for node, (x, y, z) in nodes.items():
             G.add_node(node, x=x, y=y, height=z)
@@ -475,8 +475,8 @@ class PremadeScenarios:
             2: (400, 0, 100),   # cliff up
             3: (450, 0, 100),   # flat top
             4: (600, 0, 0),     # cliff down
-            # 5: (750, 0, 0),     # flat bottom
-            # 6: (900, 0, 100),   # cliff up
+            5: (750, 0, 0),     # flat bottom
+            6: (900, 0, 100),   # cliff up
             7: (1050, 0, 0)   # flat top
         }
         for node, (x, y, z) in nodes.items():
@@ -486,10 +486,9 @@ class PremadeScenarios:
             (1, 2, "cliff"),
             (2, 3, "grass"),
             (3, 4, "cliff"),
-            # (4, 5, "grass"),
-            (4, 7, "grass"),
-            # (5, 6, "cliff"),
-            # (6, 7, "grass")
+            (4, 5, "grass"),
+            (5, 6, "cliff"),
+            (6, 7, "grass")
         ]
         for (u, v, terrain) in edges:
             G.add_edge(u, v, terrain=terrain)
@@ -539,9 +538,9 @@ class PremadeScenarios:
             # "scenario_0": cls.scenario_0(),
             # "scenario_1": cls.scenario_1(),
             # "scenario_2": cls.scenario_2(),
-            # "straight_grass": cls.straight_grass(),
+            "straight_grass": cls.straight_grass(),
             # "straight_water": cls.straight_water(),
-            "fly_up_cliff": cls.fly_up_cliff(),
+            # "fly_up_cliff": cls.fly_up_cliff(),
             # "two_slopes": cls.two_slopes(),
         }
 

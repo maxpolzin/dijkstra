@@ -108,9 +108,9 @@ GOAL = (7, 'drive')
 ENERGY_VS_TIME = 0.0
 
 # Create a Joblib Memory object for caching.
-memory = Memory("cache_dir", verbose=1)
+memory = Memory("cache_dir", verbose=0)
 
-# @memory.cache
+@memory.cache
 def compute_for_scenario(name, graph, constants):
     print(f"Processing scenario: {name} with constants: {constants}")
     G_world = graph
@@ -135,64 +135,63 @@ import pickle
 from dijkstra_scenario import build_world_graph, build_layered_graph, PremadeScenarios
 
 all_scenarios = PremadeScenarios.get_all()
-all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
+# all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
+all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))[0:16]
 
-# def process_variation(idx, var_constants):
-#     print(f"\n--- Processing parameter variation {idx} ---")
+
+def process_variation(idx, var_constants):
+    print(f"\n--- Processing parameter variation {idx} ---")
     
-#     results_list = []
-#     for name, graph in all_scenarios.items():
-#         results_list.append(compute_for_scenario(name, graph, constants=var_constants))
+    results_list = []
+    for name, graph in all_scenarios.items():
+        results_list.append(compute_for_scenario(name, graph, constants=var_constants))
 
-#     scenario_results = {name: data for name, data in results_list}
-#     return idx, {"constants": var_constants, "results": scenario_results}
+    scenario_results = {name: data for name, data in results_list}
+    return idx, {"constants": var_constants, "results": scenario_results}
 
 
-# pickle_file = "all_results.pkl"
+recompute = True
+pickle_file = "all_results.pkl"
 
-# if os.path.exists(pickle_file):
-#     print("Loading all_results from pickle file...")
-#     with open(pickle_file, "rb") as f:
-#         all_results = pickle.load(f)
-# else:
-#     print("Computing all_results...")
+if os.path.exists(pickle_file) and not recompute:
+    print("Loading all_results from pickle file...")
+    with open(pickle_file, "rb") as f:
+        all_results = pickle.load(f)
+else:
+    print("Computing all_results...")
    
-#     all_results_list = Parallel(n_jobs=-1)(
-#         delayed(process_variation)(idx, var_constants)
-#         for idx, var_constants in enumerate(all_variations)
-#     )
-#     # all_results_list = []
-#     # for idx, var_constants in enumerate(all_variations):
-#     #     all_results_list.append(process_variation(idx,var_constants))
-   
-#     # Convert the list of tuples into a dictionary keyed by variation index.
-#     all_results = {idx: data for idx, data in all_results_list}
+    all_results_list = Parallel(n_jobs=-1)(
+        delayed(process_variation)(idx, var_constants)
+        for idx, var_constants in enumerate(all_variations)
+    )
 
-#     # Save to pickle file.
-#     with open(pickle_file, "wb") as f:
-#         pickle.dump(all_results, f)
-#     print("Computed and saved all_results.")
+    all_results = {idx: data for idx, data in all_results_list}
+
+    with open(pickle_file, "wb") as f:
+        pickle.dump(all_results, f)
+    print("Computed and saved all_results.")
 
 
 
 
+# name = "straight_grass"
+# graph = all_scenarios[name]
+# var_constants = all_variations[0]
+
+# results_list = [compute_for_scenario(name, graph, constants=var_constants)]
+# scenario_results = {name: data for name, data in results_list}
+
+# all_results_list = [(0, {"constants": var_constants, "results": scenario_results})]
+# all_results = {idx: data for idx, data in all_results_list}
 
 
-# %%
-
-
-name = "fly_up_cliff"
-graph = all_scenarios[name]
-var_constants = all_variations[0]
-
-results_list = [compute_for_scenario(name, graph, constants=var_constants)]
-
-scenario_results = {name: data for name, data in results_list}
-
-all_results_list = [(0, {"constants": var_constants, "results": scenario_results})]
-all_results = {idx: data for idx, data in all_results_list}
-
-
+# "scenario_0": cls.scenario_0(),
+# "scenario_1": cls.scenario_1(),
+# # "scenario_2": cls.scenario_2(),
+# "straight_grass": cls.straight_grass(),
+# "straight_water": cls.straight_water(),
+# "fly_up_cliff": cls.fly_up_cliff(),
+# "two_slopes": cls.two_slopes(),
 
 
 # sensitivity to robot/parameter changes
@@ -212,7 +211,7 @@ from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_met
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
 selected_variation = 0
-selected_scenario = "fly_up_cliff"
+selected_scenario = "straight_grass"
 if selected_scenario in all_results[selected_variation]["results"]:
     constants = all_results[selected_variation]["constants"]
     data = all_results[selected_variation]["results"][selected_scenario]
@@ -228,30 +227,19 @@ if selected_scenario in all_results[selected_variation]["results"]:
     print(optimal_path)
     print("-----")
 
-    for idx, meta_path in enumerate(meta_paths):
-        path = meta_path.path_obj
-        print(f"Path {idx}: {path}")
-        print("-----")
-
-    plot_basic_metrics(meta_paths, pareto_front)
+    # plot_basic_metrics(meta_paths, pareto_front)
 else:
     print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
 
 
-# "scenario_0": cls.scenario_0(),
-# "scenario_1": cls.scenario_1(),
-# # "scenario_2": cls.scenario_2(),
-# "straight_grass": cls.straight_grass(),
-# "straight_water": cls.straight_water(),
-# "fly_up_cliff": cls.fly_up_cliff(),
-# "two_slopes": cls.two_slopes(),
+
 
 
 ###############################################################################
 # Visualization of parameter variations for a single scenario
 ###############################################################################
 
-selected_scenario = "fly_up_cliff"
+selected_scenario = "straight_grass"
 visualize_param_variations(all_results, selected_scenario)
 
 # %% 
