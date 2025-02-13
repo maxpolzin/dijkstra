@@ -444,13 +444,13 @@ class PremadeScenarios:
         G = nx.Graph()
         nodes = {
             0: (0, 0, 0),
-            1: (700, 0, 0),
-            2: (1400, 0, 0),
-            3: (2100, 0, 0),
-            4: (2800, 0, 0),
-            5: (3500, 0, 0),
-            6: (4200, 0, 0),
-            7: (4900, 0, 0)
+            1: (250, 0, 0),
+            2: (500, 0, 0),
+            3: (750, 0, 0),
+            4: (1000, 0, 0),
+            5: (1250, 0, 0),
+            6: (1500, 0, 0),
+            7: (1750, 0, 0)
         }
         for node, (x, y, z) in nodes.items():
             G.add_node(node, x=x, y=y, height=z)
@@ -538,8 +538,8 @@ class PremadeScenarios:
             # "scenario_0": cls.scenario_0(),
             # "scenario_1": cls.scenario_1(),
             # "scenario_2": cls.scenario_2(),
-            "straight_grass": cls.straight_grass(),
-            # "straight_water": cls.straight_water(),
+            # "straight_grass": cls.straight_grass(),
+            "straight_water": cls.straight_water(),
             # "fly_up_cliff": cls.fly_up_cliff(),
             # "two_slopes": cls.two_slopes(),
         }

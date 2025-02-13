@@ -211,7 +211,7 @@ from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_met
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
 selected_variation = 0
-selected_scenario = "straight_grass"
+selected_scenario = "straight_water"
 if selected_scenario in all_results[selected_variation]["results"]:
     constants = all_results[selected_variation]["constants"]
     data = all_results[selected_variation]["results"][selected_scenario]
@@ -239,7 +239,7 @@ else:
 # Visualization of parameter variations for a single scenario
 ###############################################################################
 
-selected_scenario = "straight_grass"
+selected_scenario = "straight_water"
 visualize_param_variations(all_results, selected_scenario)
 
 # %% 
