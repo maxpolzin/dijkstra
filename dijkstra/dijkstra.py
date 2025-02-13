@@ -185,10 +185,6 @@ else:
 # all_results = {idx: data for idx, data in all_results_list}
 
 
-# "scenario_0": cls.scenario_0(),
-# "scenario_1": cls.scenario_1(),
-# # "scenario_2": cls.scenario_2(),
-# "two_slopes": cls.two_slopes(),
 
 
 # sensitivity to robot/parameter changes
@@ -208,7 +204,7 @@ from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_met
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
 selected_variation = 0
-selected_scenario = "two_slopes"
+selected_scenario = "scenario_0"
 if selected_scenario in all_results[selected_variation]["results"]:
     constants = all_results[selected_variation]["constants"]
     data = all_results[selected_variation]["results"][selected_scenario]
@@ -236,7 +232,6 @@ else:
 # Visualization of parameter variations for a single scenario
 ###############################################################################
 
-selected_scenario = "two_slopes"
 visualize_param_variations(all_results, selected_scenario)
 
 # %% 
