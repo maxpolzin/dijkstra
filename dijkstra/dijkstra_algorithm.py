@@ -77,12 +77,50 @@ class Path:
                 switches.add(current_node)
         return switches
 
+
     def __str__(self):
-        result = f"Path: {self.path}\n"
+        if not self.state_chain:
+            return "Empty path."
+        
+        # Header with an additional "Note" column.
+        header = (f"{'Segment':>7} | {'Node':>4} | {'Mode':>6} | "
+                f"{'Seg.Time (s)':>12} | {'Seg.Energy (Wh)':>16} | "
+                f"{'Cum.Time (s)':>12} | {'Cum.Energy (Wh)':>16} | {'Note':>30}\n")
+        separator = "⎻" * (7 + 4 + 6 + 12 + 16 + 12 + 16 + 30 + 21)  # Adjust as needed
+        result = "Detailed Path Information:\n"
+        result += header
+        result += separator + "\n"
+        
+        for i, state in enumerate(self.state_chain):
+            note = ""
+            # Determine the incremental segment values.
+            if state.predecessor is None:
+                seg_time = state.cum_time
+                seg_energy = state.cum_energy
+            else:
+                seg_time = state.cum_time - state.predecessor.cum_time
+                seg_energy = state.cum_energy - state.predecessor.cum_energy
+            
+            # If the mode changes from the previous state, indicate it in the note.
+            if state.predecessor is not None and state.mode != state.predecessor.mode:
+                note = f"Switched from {state.predecessor.mode} to {state.mode}"
+            
+            # If this state is the result of a recharge, append that information.
+            if state.did_recharge:
+                # If there is already a note, separate with a semicolon.
+                if note:
+                    note += "; "
+                note += f"Recharged for {seg_time:.2f}s"
+            
+            result += (f"{i:7d} | {state.node:>4} | {state.mode:>6} | "
+                    f"{seg_time:12.2f} | {seg_energy:16.2f} | "
+                    f"{state.cum_time:12.2f} | {state.cum_energy:16.2f} | {note:>30}\n")
+        
+        result += "\n"
         result += f"Switch nodes (IDs): {self.switch_nodes}\n"
         result += "Recharge events (node, mode): " + ", ".join(str(r) for r in self.recharge_events) + "\n"
-        result += f"Total time: {self.total_time:.1f}s\n"
-        result += f"Total energy: {self.total_energy:.3f} Wh"
+        result += f"Total travel time: {self.total_time:.1f} s\n"
+        result += f"Total energy consumption: {self.total_energy:.3f} Wh\n"
         return result
 
 
@@ -209,12 +247,21 @@ def process_simple_path(path, L, energy_vs_time, constants, dbg=False):
 #########################################
 
 def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_time, dbg=False):
-    best_state = {}
+    # A helper that determines if state s1 dominates state s2.
+    def dominates(s1, s2):
+        t1, t2 = s1.cum_time, s2.cum_time
+        b1, b2 = battery_remaining(s1, constants), battery_remaining(s2, constants)
+        # s1 dominates s2 if it has lower (or equal) time AND higher (or equal) battery,
+        # with at least one strictly better.
+        return (t1 <= t2 and b1 >= b2) and (t1 < t2 or b1 > b2)
+    
+    # best_states now maps each (node, mode) to a Pareto set (list) of states.
+    best_states = defaultdict(list)
     priority_queue = []
     
     source = State(start[0], start[1], cum_energy=0.0, cum_time=0.0)
     source.compute_cost(energy_vs_time)
-    best_state[(source.node, source.mode)] = source.cost
+    best_states[(source.node, source.mode)].append(source)
     heapq.heappush(priority_queue, source)
     
     if dbg:
@@ -222,18 +269,15 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_
         
     while priority_queue:
         current_state = heapq.heappop(priority_queue)
-        
         if dbg:
             print(f"Popped {current_state}")
-        
-        # Skip if a better state has already been processed.
-        if current_state.cost > best_state.get((current_state.node, current_state.mode), float('inf')):
-            if dbg:
-                print("Skipping outdated state.")
+            
+        # Check that the popped state is still part of the Pareto set.
+        if current_state not in best_states[(current_state.node, current_state.mode)]:
             continue
-
+        
         if (current_state.node, current_state.mode) == (goal[0], goal[1]):
-            # Reconstruct the state chain for the found path.
+            # Reconstruct the state chain.
             state_chain = []
             state = current_state
             while state is not None:
@@ -245,7 +289,6 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_
         for neighbor in L.successors((current_state.node, current_state.mode)):
             edge = L[(current_state.node, current_state.mode)][neighbor]
             neighbor_node, neighbor_mode = neighbor        
-
             new_cum_energy, new_cum_time, did_recharge = compute_edge_transition(current_state, edge, constants)
             
             new_state = State(neighbor_node, neighbor_mode, new_cum_energy, new_cum_time)
@@ -253,12 +296,31 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_
             new_state.did_recharge = did_recharge
             new_state.compute_cost(energy_vs_time)
             
-            if new_state.cost < best_state.get((neighbor_node, neighbor_mode), float('inf')):
-                best_state[(neighbor_node, neighbor_mode)] = new_state.cost
-                heapq.heappush(priority_queue, new_state)
-                if dbg:
-                    print(f"Updated: {new_state}")
-                    
+            # Check if new_state is dominated by any state already in best_states for this key.
+            dominated_flag = False
+            for s in best_states[(neighbor_node, neighbor_mode)]:
+                if dominates(s, new_state):
+                    dominated_flag = True
+                    if dbg:
+                        print(f"Skipping {new_state} as it is dominated by {s}")
+                    break
+            if dominated_flag:
+                continue
+            
+            # Remove any states that are dominated by the new_state.
+            non_dominated = []
+            for s in best_states[(neighbor_node, neighbor_mode)]:
+                if not dominates(new_state, s):
+                    non_dominated.append(s)
+                else:
+                    if dbg:
+                        print(f"Removing dominated state {s} in favor of {new_state}")
+            best_states[(neighbor_node, neighbor_mode)] = non_dominated + [new_state]
+            
+            heapq.heappush(priority_queue, new_state)
+            if dbg:
+                print(f"Added {new_state}")
+                
     return Path([])
 
 

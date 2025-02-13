@@ -389,8 +389,16 @@ def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
                markerfacecolor=color, markersize=8, label=mode.capitalize())
         for mode, color in mode_colors.items()
     ]
-    ax.legend(handles=legend_elements, title="Dominant Mode\n(by time)", loc="upper right",
-              prop={'size': 8}, title_fontsize=8)
+
+    ax.legend(handles=legend_elements,
+          title="Dominant Mode (by time)",
+          loc="best",
+        #   bbox_to_anchor=(0.5, 0.0),  # Moves the legend to the right outside the figure.
+          ncol=3,
+          prop={'size': 8}, 
+          title_fontsize=8)
+
+
 
 def visualize_param_variations(all_results, selected_scenario, n_cols=3):
     # Define a color mapping for modes.
@@ -523,7 +531,7 @@ def plot_basic_metrics(meta_paths, pareto_front):
     pareto_mask = np.array([meta in pareto_front for meta in meta_paths])
     
     # Create three subplots side-by-side.
-    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+    fig, axs = plt.subplots(1, 3, figsize=(10, 4))
     
     plot_time_histogram(times, axs[0])
     plot_energy_histogram(energies, axs[1])

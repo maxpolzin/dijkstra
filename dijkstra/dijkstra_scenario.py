@@ -417,13 +417,13 @@ class PremadeScenarios:
         G = nx.Graph()
         nodes = {
             0: (0, 0, 0),
-            1: (150, 0, 0),
-            2: (300, 0, 0),
-            3: (450, 0, 0),
-            4: (600, 0, 0),
-            5: (750, 0, 0),
-            6: (900, 0, 0),
-            7: (1050, 0, 0)
+            1: (430, 0, 0),
+            2: (860, 0, 0),
+            3: (1290, 0, 0),
+            4: (1720, 0, 0),
+            5: (2150, 0, 0),
+            6: (2580, 0, 0),
+            7: (3010, 0, 0)
         }
         for node, (x, y, z) in nodes.items():
             G.add_node(node, x=x, y=y, height=z)
@@ -444,13 +444,13 @@ class PremadeScenarios:
         G = nx.Graph()
         nodes = {
             0: (0, 0, 0),
-            1: (150, 0, 0),
-            2: (300, 0, 0),
-            3: (450, 0, 0),
-            4: (600, 0, 0),
-            5: (750, 0, 0),
-            6: (900, 0, 0),
-            7: (1050, 0, 0)
+            1: (700, 0, 0),
+            2: (1400, 0, 0),
+            3: (2100, 0, 0),
+            4: (2800, 0, 0),
+            5: (3500, 0, 0),
+            6: (4200, 0, 0),
+            7: (4900, 0, 0)
         }
         for node, (x, y, z) in nodes.items():
             G.add_node(node, x=x, y=y, height=z)
@@ -472,12 +472,12 @@ class PremadeScenarios:
         nodes = {
             0: (0, 0, 0),       # flat ground
             1: (150, 0, 0),     # flat ground
-            2: (300, 0, 100),   # cliff up
+            2: (400, 0, 100),   # cliff up
             3: (450, 0, 100),   # flat top
             4: (600, 0, 0),     # cliff down
-            5: (750, 0, 0),     # flat bottom
-            6: (900, 0, 100),   # cliff up
-            7: (1050, 0, 100)   # flat top
+            # 5: (750, 0, 0),     # flat bottom
+            # 6: (900, 0, 100),   # cliff up
+            7: (1050, 0, 0)   # flat top
         }
         for node, (x, y, z) in nodes.items():
             G.add_node(node, x=x, y=y, height=z)
@@ -486,9 +486,10 @@ class PremadeScenarios:
             (1, 2, "cliff"),
             (2, 3, "grass"),
             (3, 4, "cliff"),
-            (4, 5, "grass"),
-            (5, 6, "cliff"),
-            (6, 7, "grass")
+            # (4, 5, "grass"),
+            (4, 7, "grass"),
+            # (5, 6, "cliff"),
+            # (6, 7, "grass")
         ]
         for (u, v, terrain) in edges:
             G.add_edge(u, v, terrain=terrain)
@@ -535,13 +536,13 @@ class PremadeScenarios:
         Returns a dictionary mapping scenario names to the generated graphs.
         """
         return {
-            "scenario_0": cls.scenario_0(),
-            "scenario_1": cls.scenario_1(),
+            # "scenario_0": cls.scenario_0(),
+            # "scenario_1": cls.scenario_1(),
             # "scenario_2": cls.scenario_2(),
-            "straight_grass": cls.straight_grass(),
-            "straight_water": cls.straight_water(),
+            # "straight_grass": cls.straight_grass(),
+            # "straight_water": cls.straight_water(),
             "fly_up_cliff": cls.fly_up_cliff(),
-            "two_slopes": cls.two_slopes(),
+            # "two_slopes": cls.two_slopes(),
         }
 
 
