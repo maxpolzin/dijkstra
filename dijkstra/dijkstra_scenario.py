@@ -506,14 +506,14 @@ class PremadeScenarios:
     def two_slopes():
         G = nx.Graph()
         nodes = {
-            0: (0, 0, 0),         # start flat
-            1: (150, 0, 100),      # slope up
-            2: (300, 0, 0),        # peak
-            3: (450, 0, 100),      # slope down
-            4: (600, 0, 0),        # bottom
-            5: (750, 0, 100),      # slope up
-            6: (900, 0, 0),        # peak
-            7: (1050, 0, 100)      # slope down to flat finish
+            0: (-600,    0, 0),      # Start flat
+            1: (-300, 0, 0),       # Flat finish continues
+            2: (0,  0, 0),      # Longer flat section at start
+            3: (500,  0, 100),    # Slope up ends (plateau begins)
+            4: (1600, 0, 100),    # Plateau ends (~1100 m from node 2)
+            5: (2100, 0, 0),      # Slope down begins (3700 m slope, too long for driving)
+            6: (2400, 0, 0),      # Flat finish begins
+            7: (2700, 0, 0)       # Flat finish continues
         }
         for node, (x, y, z) in nodes.items():
             G.add_node(node, x=x, y=y, height=z)
@@ -540,8 +540,8 @@ class PremadeScenarios:
             # "scenario_2": cls.scenario_2(),
             # "straight_grass": cls.straight_grass(),
             # "straight_water": cls.straight_water(),
-            "fly_up_cliff": cls.fly_up_cliff(),
-            # "two_slopes": cls.two_slopes(),
+            # "fly_up_cliff": cls.fly_up_cliff(),
+            "two_slopes": cls.two_slopes(),
         }
 
 

@@ -32,10 +32,10 @@
 
 # %%
 
-%reload_ext autoreload
-%autoreload 2
+# %reload_ext autoreload
+# %autoreload 2
 
-%matplotlib widget
+# %matplotlib widget
 
 import os
 import copy
@@ -87,7 +87,7 @@ CONSTANTS = {
     'SWITCH_TIME': 100.0,    # s
     'SWITCH_ENERGY': 1.0,    # Wh
     'BATTERY_CAPACITY': 30.0,  # Wh
-    'RECHARGE_TIME': 1000.0,   # s
+    'RECHARGE_TIME': 30000.0,   # s
     'MODES': {
         'fly':   {'speed': 10.0,  'power': 1000.0},  # m/s, W
         'swim':  {'speed': 0.5,  'power':   10.0},
@@ -188,7 +188,6 @@ else:
 # "scenario_0": cls.scenario_0(),
 # "scenario_1": cls.scenario_1(),
 # # "scenario_2": cls.scenario_2(),
-# "fly_up_cliff": cls.fly_up_cliff(),
 # "two_slopes": cls.two_slopes(),
 
 
@@ -209,7 +208,7 @@ from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_met
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
 selected_variation = 0
-selected_scenario = "fly_up_cliff"
+selected_scenario = "two_slopes"
 if selected_scenario in all_results[selected_variation]["results"]:
     constants = all_results[selected_variation]["constants"]
     data = all_results[selected_variation]["results"][selected_scenario]
@@ -237,7 +236,7 @@ else:
 # Visualization of parameter variations for a single scenario
 ###############################################################################
 
-selected_scenario = "fly_up_cliff"
+selected_scenario = "two_slopes"
 visualize_param_variations(all_results, selected_scenario)
 
 # %% 
