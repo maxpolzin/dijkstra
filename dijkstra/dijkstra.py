@@ -178,8 +178,19 @@ else:
     print("Computed and saved all_results.")
 
 
-
 # %%
+
+###############################################################################
+# Visualization of parameter variations for a single scenario
+###############################################################################
+for scenario in all_scenarios:
+    print(f"Scenario: {scenario}")
+    visualize_param_variations(all_results, scenario)
+
+
+
+# %% 
+
 
 # For singel example scneario
 
@@ -194,20 +205,6 @@ else:
 # all_results = {idx: data for idx, data in all_results_list}
 
 
-
-# %%
-
-###############################################################################
-# Visualization of parameter variations for a single scenario
-###############################################################################
-for scenario in all_scenarios:
-    print(f"Scenario: {scenario}")
-    visualize_param_variations(all_results, scenario)
-
-
-
-
-# %% 
 
 ###############################################################################
 # Visualization of a single scenario for single parameter variation
