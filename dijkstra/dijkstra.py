@@ -27,7 +27,6 @@
         # result is a table scenario 1,2,3,4 vs. no mode
         # no flying, no rolling, no swimming, no driving, no recharging
 
-    # can we get optimal pareto paths 0.1/0.9 for energy/cost from higher resolution grids with complex graph
 
 
 # %%
@@ -161,7 +160,7 @@ if os.path.exists(pickle_file) and not recompute:
 else:
     print("Computing all_results...")
    
-    all_results_list = Parallel(n_jobs=-1)(
+    all_results_list = Parallel(n_jobs=8)(
         delayed(process_variation)(idx, var_constants)
         for idx, var_constants in enumerate(all_variations)
     )
