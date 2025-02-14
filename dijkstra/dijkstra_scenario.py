@@ -184,7 +184,7 @@ class PremadeScenarios:
         
         fly_offset = 52.6
         d_drive = 1800
-        cliff_offset = -2413
+        cliff_offset = -2414
 
         nodes = {
             0: (0,    0, 0),
