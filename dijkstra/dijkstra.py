@@ -141,8 +141,7 @@ import pickle
 from dijkstra_scenario import PremadeScenarios
 
 all_scenarios = PremadeScenarios.get_all()
-# all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
-all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))[0:16]
+all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
 
 
 def process_variation(idx, var_constants):
@@ -213,7 +212,7 @@ for scenario in all_scenarios:
 ###############################################################################
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
-selected_variation = 14
+selected_variation = 0
 selected_scenario = "scenario_1"
 if selected_scenario in all_results[selected_variation]["results"]:
     constants = all_results[selected_variation]["constants"]
@@ -230,7 +229,7 @@ if selected_scenario in all_results[selected_variation]["results"]:
     print(optimal_path)
     print("-----")
 
-    plot_basic_metrics(meta_paths, pareto_front)
+    plot_basic_metrics(meta_paths, pareto_front, optimal_path)
 else:
     print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
 

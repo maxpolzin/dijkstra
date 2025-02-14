@@ -388,7 +388,7 @@ def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
               prop={'size': 8}, title_fontsize=8)
 
 
-def plot_basic_metrics(meta_paths, pareto_front, optimal_path=None):
+def plot_basic_metrics(meta_paths, pareto_front, optimal_path):
     times = [m.total_time for m in meta_paths]
     energies = [m.total_energy for m in meta_paths]
     distances = [sum(m.mode_distances.values()) for m in meta_paths]
