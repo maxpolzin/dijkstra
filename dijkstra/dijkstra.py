@@ -141,7 +141,7 @@ import pickle
 from dijkstra_scenario import PremadeScenarios
 
 all_scenarios = PremadeScenarios.get_all()
-all_variations = list(SensitivityConstants(CONSTANTS, variation=0.3)) # 0.2, 0.5
+all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2)) # 0.2, 0.5
 
 
 def process_variation(idx, var_constants):
