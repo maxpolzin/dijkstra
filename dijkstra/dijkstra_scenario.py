@@ -182,7 +182,7 @@ class PremadeScenarios:
         
         d_water = 1700
         
-        fly_offset = 52.6
+        fly_offset = 52.7
         d_drive = 1800
         cliff_offset = -2414
 
