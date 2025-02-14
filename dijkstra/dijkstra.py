@@ -58,7 +58,7 @@ from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_met
 # %%
 
 class SensitivityConstants:
-    def __init__(self, constants, variation=0.2):
+    def __init__(self, constants, variation):
         self.constants = constants
         self.variation = variation
 
@@ -141,7 +141,7 @@ import pickle
 from dijkstra_scenario import PremadeScenarios
 
 all_scenarios = PremadeScenarios.get_all()
-all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))[0:16]
+all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
 
 
 def process_variation(idx, var_constants):
