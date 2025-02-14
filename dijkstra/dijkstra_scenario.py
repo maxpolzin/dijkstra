@@ -181,24 +181,23 @@ class PremadeScenarios:
     def scenario_4():
         
         d_water = 1700
+        
+        fly_offset = 52.6
+        d_drive = 1800
+        cliff_offset = -2413
 
         nodes = {
-            0: (0, 0, 0),
-            1: (340, 0, 0),
-            4: (680, 0, 0),
-            5: (1020, 0, 0),
-            6: (1360, 0, 0),
-            2: (d_water/2, math.sqrt(1800**2 - (d_water/2)**2), 0),
+            0: (0,    0, 0),
+            1: (fly_offset, 0, 0),
+            4: (fly_offset + (d_water-fly_offset)/2, 0, 0),
+            2: (d_water / 2, math.sqrt(d_drive**2 - (d_water/2)**2), 0),
             7: (d_water, 0, 0),
-            3: (0, -2413, 100)
+            3: (0, cliff_offset, 100)
         }
-
         edges = [
             (0, 1, "water"),
             (1, 4, "water"),
-            (4, 5, "water"),
-            (5, 6, "water"),
-            (6, 7, "water"),
+            (4, 7, "water"),
             (0, 2, "grass"),
             (2, 7, "grass"),
             (0, 3, "slope"),
