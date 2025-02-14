@@ -144,6 +144,7 @@ class MetaPath:
         # Initialize per-mode time and energy dictionaries.
         self.mode_times = {}
         self.mode_energies = {}
+        self.mode_distances = {}
 
         # Loop over consecutive states to compute incremental energy and time.
         for i in range(1, len(self.state_chain)):
@@ -167,10 +168,19 @@ class MetaPath:
             self.mode_energies[mode] = self.mode_energies.get(mode, 0) + dE
             self.mode_times[mode] = self.mode_times.get(mode, 0) + dt
 
+            if mode in constants.get('MODES', {}):
+                speed = constants['MODES'][mode]['speed']
+                distance = dt * speed
+            else:
+                distance = 0
+            self.mode_distances[mode] = self.mode_distances.get(mode, 0) + distance
+
+
     def __repr__(self):
         return (f"MetaPath(total_time={self.total_time:.2f}, total_energy={self.total_energy:.2f}, "
                 f"recharges={self.recharges}, switches={self.switches}, "
-                f"mode_times={self.mode_times}, mode_energies={self.mode_energies})")
+                f"mode_times={self.mode_times}, mode_energies={self.mode_energies}, "
+                f"mode_distances={self.mode_distances})")
 
 
 #########################################
@@ -332,23 +342,6 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_
     return Path([])
 
 
-
-def compute_pareto_front(meta_paths):
-    pareto = []
-    for m in meta_paths:
-        dominated = False
-        for n in meta_paths:
-            if n == m:
-                continue
-            if (n.total_time <= m.total_time and n.total_energy <= m.total_energy and
-                (n.total_time < m.total_time or n.total_energy < m.total_energy)):
-                dominated = True
-                break
-        if not dominated:
-            pareto.append(m)
-    return pareto
-
-
 @timed
 def process_subgraph(subgraph, start, goal, L, energy_vs_time, constants, dbg):
     candidate_paths = list(nx.all_simple_paths(subgraph, source=start, target=goal))
@@ -404,6 +397,22 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, 
         print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
 
     return feasible_paths
+
+
+def compute_pareto_front(meta_paths):
+    pareto = []
+    for m in meta_paths:
+        dominated = False
+        for n in meta_paths:
+            if n == m:
+                continue
+            if (n.total_time <= m.total_time and n.total_energy <= m.total_energy and
+                (n.total_time < m.total_time or n.total_energy < m.total_energy)):
+                dominated = True
+                break
+        if not dominated:
+            pareto.append(m)
+    return pareto
 
 
 def analyze_paths(paths, constants):

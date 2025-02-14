@@ -246,20 +246,6 @@ def visualize_world_with_multiline_3D(
     plt.show()
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def visualize_world_and_graph(dem, terrain, G):
     """
     Visualize a 3D world from:
@@ -346,21 +332,21 @@ def visualize_world_and_graph(dem, terrain, G):
 # Basic Metrics Plot: Histograms and Scatter Plot.
 # =============================================================================
 def plot_time_histogram(times, ax):
-    """
-    Plots a histogram of travel times on the given axis.
-    """
     ax.hist(times, bins=20, color='skyblue', edgecolor='black')
     ax.set_title("Histogram of Travel Times")
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("Count")
 
 def plot_energy_histogram(energies, ax):
-    """
-    Plots a histogram of energy consumption on the given axis.
-    """
     ax.hist(energies, bins=20, color='salmon', edgecolor='black')
     ax.set_title("Histogram of Energy Consumption")
     ax.set_xlabel("Energy [Wh]")
+    ax.set_ylabel("Count")
+
+def plot_distance_histogram(distances, ax):
+    ax.hist(distances, bins=20, color='lightblue', edgecolor='black')
+    ax.set_title("Histogram of Distances")
+    ax.set_xlabel("Distance")
     ax.set_ylabel("Count")
 
 def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
@@ -368,12 +354,10 @@ def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
     energies = np.array(energies)
     colors = np.array(colors)
     
-    # Plot non-Pareto points
     non_pareto_idx = ~pareto_mask
     if non_pareto_idx.sum() > 0:
         ax.scatter(times[non_pareto_idx], energies[non_pareto_idx],
                    color=colors[non_pareto_idx], alpha=0.7, edgecolors='none')
-    # Plot Pareto points with a black edge.
     pareto_idx = pareto_mask
     if pareto_idx.sum() > 0:
         ax.scatter(times[pareto_idx], energies[pareto_idx],
@@ -383,25 +367,22 @@ def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
     ax.set_xlabel("Travel Time [s]")
     ax.set_ylabel("Energy Consumption [Wh]")
     
-    # Create custom legend handles.
     legend_elements = [
         Line2D([0], [0], marker='o', color='w',
                markerfacecolor=color, markersize=8, label=mode.capitalize())
         for mode, color in mode_colors.items()
     ]
-
     ax.legend(handles=legend_elements,
-          title="Dominant Mode (by time)",
-          loc="best",
-        #   bbox_to_anchor=(0.5, 0.0),  # Moves the legend to the right outside the figure.
-          ncol=3,
-          prop={'size': 8}, 
-          title_fontsize=8)
+              title="Dominant Mode (by distance)",
+              loc="best", ncol=3,
+              prop={'size': 8}, title_fontsize=8)
 
 
-
-def visualize_param_variations(all_results, selected_scenario, n_cols=3):
-    # Define a color mapping for modes.
+def plot_basic_metrics(meta_paths, pareto_front):
+    times = [m.total_time for m in meta_paths]
+    energies = [m.total_energy for m in meta_paths]
+    distances = [sum(m.mode_distances.values()) for m in meta_paths]
+    
     mode_colors = {
         'fly': 'skyblue',
         'drive': 'lightgreen',
@@ -411,7 +392,58 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
         'switching': 'lightgrey'
     }
     
-    # Collect all variation keys that contain the selected scenario.
+    scatter_colors = []
+    for m in meta_paths:
+        if m.mode_distances:
+            dominant_mode = max(m.mode_distances, key=m.mode_distances.get)
+            scatter_colors.append(mode_colors.get(dominant_mode, 'blue'))
+        else:
+            scatter_colors.append('blue')
+    
+    pareto_mask = np.array([m in pareto_front for m in meta_paths])
+    
+    fig, axs = plt.subplots(2, 2, figsize=(8, 7))
+    
+    plot_time_histogram(times, axs[0, 0])
+    plot_energy_histogram(energies, axs[0, 1])
+    plot_distance_histogram(distances, axs[1, 0])
+    plot_scatter_paths(times, energies, scatter_colors, pareto_mask, axs[1, 1], mode_colors)
+    
+    plt.tight_layout()
+    plt.show()
+
+
+def format_constants(constants):
+    battery_str = "Battery:({}s,{}Wh)".format(
+        int(round(constants["RECHARGE_TIME"])),
+        int(round(constants["BATTERY_CAPACITY"]))
+    )
+    switch_str = "Switch:({}s,{}Wh)".format(
+        int(round(constants["SWITCH_TIME"])),
+        int(round(constants["SWITCH_ENERGY"]))
+    )
+    mode_strs = []
+    for mode, vals in constants["MODES"].items():
+        mode_str = "{}:({}m/s,{}W)".format(
+            mode.capitalize(),
+            int(round(vals["speed"])),
+            int(round(vals["power"]))
+        )
+        mode_strs.append(mode_str)
+    return ", ".join([battery_str, switch_str] + mode_strs)
+
+
+
+def visualize_param_variations(all_results, selected_scenario, n_cols=3):
+    mode_colors = {
+        'fly': 'skyblue',
+        'drive': 'lightgreen',
+        'roll': 'orange',
+        'swim': 'purple',
+        'recharging': 'black',
+        'switching': 'lightgrey'
+    }
+    
     variation_keys = sorted([k for k, v in all_results.items() if selected_scenario in v["results"]])
     n_variations = len(variation_keys)
     if n_variations == 0:
@@ -419,7 +451,6 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
         return
     n_rows = int(np.ceil(n_variations / n_cols))
     
-    # First pass: compute global x and y limits across all variations.
     all_times = []
     all_energies = []
     for var in variation_keys:
@@ -429,7 +460,6 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
         energies = [m.total_energy for m in meta_paths]
         all_times.extend(times)
         all_energies.extend(energies)
-    # Compute global limits with a small margin.
     x_min, x_max = min(all_times), max(all_times)
     y_min, y_max = min(all_energies), max(all_energies)
     x_margin = 0.05 * (x_max - x_min) if x_max > x_min else 1
@@ -437,9 +467,22 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
     global_xlim = (x_min - x_margin, x_max + x_margin)
     global_ylim = (y_min - y_margin, y_max + y_margin)
     
-    # Create subplots.
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(n_cols * 4, n_rows * 4), sharex=True, sharey=True)
     axs = np.array(axs).flatten()
+    
+    # Set main title with scenario name.
+    fig.suptitle(f"Scenario: {selected_scenario}", fontsize=14)
+    
+    # Integrate constants info into the legend title.
+    baseline_constants = all_results[0]["constants"]
+    legend_title = format_constants(baseline_constants) + "\n\nDominant Mode (by distance)"
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=color,
+               markersize=8, label=mode.capitalize())
+        for mode, color in mode_colors.items()
+    ]
+    fig.legend(handles=legend_elements, loc="upper center", bbox_to_anchor=(0.5, 0.93),
+               ncol=len(legend_elements), prop={'size': 8}, title=legend_title, title_fontsize=8)
     
     for idx, var in enumerate(variation_keys):
         ax = axs[idx]
@@ -449,100 +492,44 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
         pareto_front = data["pareto_front"]
         optimal_path = data["optimal_path"]
         
-        # Extract overall metrics.
         times = [m.total_time for m in meta_paths]
         energies = [m.total_energy for m in meta_paths]
         
-        # Determine dominant mode color for each meta path.
+        # Determine dominant mode color based on mode_distances.
         colors = []
         for meta in meta_paths:
-            if meta.mode_times:
-                # Filter out the 'recharging' mode before determining the dominant mode.
-                filtered_mode_times = {mode: t for mode, t in meta.mode_times.items() if mode != 'recharging'}
-                if filtered_mode_times:
-                    dominant_mode = max(filtered_mode_times, key=filtered_mode_times.get)
-                else:
-                    dominant_mode = None
+            if meta.mode_distances:
+                dominant_mode = max(meta.mode_distances, key=meta.mode_distances.get)
                 colors.append(mode_colors.get(dominant_mode, 'blue'))
             else:
                 colors.append('blue')
         
-        # Create a Boolean mask for Pareto points.
         pareto_mask = np.array([m in pareto_front for m in meta_paths])
         
-        # Plot scatter using your plot_scatter_paths helper.
         plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors)
         
-        # Show cost_optimal path
-        ax.scatter(optimal_path.total_time, optimal_path.total_energy, marker='X', s=100, facecolors='none', edgecolors='black', zorder=10)
-        # Remove legend for all but the first subplot.
-        if idx != 0:
-            leg = ax.get_legend()
-            if leg is not None:
-                leg.remove()
+        # Plot the optimal path with a red X marker.
+        ax.scatter(optimal_path.total_time, optimal_path.total_energy, marker='X', s=100, 
+                   facecolors='none', edgecolors='black', zorder=10)
         
-        # Set consistent x and y limits.
+        # Remove any legend from this subplot.
+        leg = ax.get_legend()
+        if leg is not None:
+            leg.remove()
+        
         ax.set_xlim(global_xlim)
         ax.set_ylim(global_ylim)
         
-        # Set a title showing variation index and optimal path stats.
-        title = (f"Var {var} - Optimal: {optimal_path.total_time:.2f}s, {optimal_path.total_energy:.2f}Wh")
+        title = (f"Var {var} - Optimal: {optimal_path.total_time:.2f}s, "
+                 f"{optimal_path.total_energy:.2f}Wh")
         ax.set_title(title)
     
-    # Remove any unused axes.
     for j in range(idx + 1, len(axs)):
         fig.delaxes(axs[j])
     
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 1, 0.85])
     plt.show()
 
-
-
-
-def plot_basic_metrics(meta_paths, pareto_front):
-    """
-    Creates three subplots in one figure:
-      - A histogram of travel times.
-      - A histogram of energy consumption.
-      - A scatter plot of travel time vs. energy consumption, where each point is
-        colored according to the mode in which the path spent the most time.
-        Pareto front paths are indicated with a black edge.
-      
-    Parameters:
-      - meta_paths: List of MetaPath objects.
-    """
-    # Extract overall metrics.
-    times = [meta.total_time for meta in meta_paths]
-    energies = [meta.total_energy for meta in meta_paths]
-    
-    # Define a color mapping for modes.
-    mode_colors = {
-        'fly': 'skyblue',
-        'drive': 'lightgreen',
-        'roll': 'orange',
-        'swim': 'purple',
-        'recharging': 'black',
-        'switching': 'lightgrey'
-    }
-    
-    # For each meta_path, determine the mode with the maximum time.
-    colors = []
-    for meta in meta_paths:
-        dominant_mode = max(meta.mode_times, key=meta.mode_times.get)
-        colors.append(mode_colors[dominant_mode])
-
-    # Compute Pareto front and create a boolean mask indicating Pareto points.
-    pareto_mask = np.array([meta in pareto_front for meta in meta_paths])
-    
-    # Create three subplots side-by-side.
-    fig, axs = plt.subplots(1, 3, figsize=(10, 4))
-    
-    plot_time_histogram(times, axs[0])
-    plot_energy_histogram(energies, axs[1])
-    plot_scatter_paths(times, energies, colors, pareto_mask, axs[2], mode_colors)
-    
-    plt.tight_layout()
-    plt.show()
 
 
 
