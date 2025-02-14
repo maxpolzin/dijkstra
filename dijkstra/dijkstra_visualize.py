@@ -16,6 +16,16 @@ def short_mode_name(mode):
     }.get(mode, '?')
 
 
+mode_colors = {
+    'fly': 'red',
+    'drive': 'lightgreen',
+    'roll': 'yellow',
+    'swim': 'blue',
+    'recharging': 'black',
+    'switching': 'lightgrey'
+}
+
+
 def build_edge_labels_for_world(G_world, L):
     edge_labels = {}
     for (u, v) in G_world.edges():
@@ -378,19 +388,10 @@ def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
               prop={'size': 8}, title_fontsize=8)
 
 
-def plot_basic_metrics(meta_paths, pareto_front):
+def plot_basic_metrics(meta_paths, pareto_front, optimal_path=None):
     times = [m.total_time for m in meta_paths]
     energies = [m.total_energy for m in meta_paths]
     distances = [sum(m.mode_distances.values()) for m in meta_paths]
-    
-    mode_colors = {
-        'fly': 'skyblue',
-        'drive': 'lightgreen',
-        'roll': 'orange',
-        'swim': 'purple',
-        'recharging': 'black',
-        'switching': 'lightgrey'
-    }
     
     scatter_colors = []
     for m in meta_paths:
@@ -408,6 +409,10 @@ def plot_basic_metrics(meta_paths, pareto_front):
     plot_energy_histogram(energies, axs[0, 1])
     plot_distance_histogram(distances, axs[1, 0])
     plot_scatter_paths(times, energies, scatter_colors, pareto_mask, axs[1, 1], mode_colors)
+    
+    # Plot the optimal path with a black cross marker if provided.
+    if optimal_path is not None:
+        axs[1, 1].scatter( optimal_path.total_time, optimal_path.total_energy, marker='X', s=100, facecolors='none', edgecolors='black', zorder=10)
     
     plt.tight_layout()
     plt.show()
@@ -435,14 +440,6 @@ def format_constants(constants):
 
 
 def visualize_param_variations(all_results, selected_scenario, n_cols=3):
-    mode_colors = {
-        'fly': 'skyblue',
-        'drive': 'lightgreen',
-        'roll': 'orange',
-        'swim': 'purple',
-        'recharging': 'black',
-        'switching': 'lightgrey'
-    }
     
     variation_keys = sorted([k for k, v in all_results.items() if selected_scenario in v["results"]])
     n_variations = len(variation_keys)

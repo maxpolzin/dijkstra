@@ -58,7 +58,7 @@ class PremadeScenarios:
     @staticmethod
     def scenario_1():
         # Predefined scenario 1
-        distance_factor = 2
+        distance_factor = 1.5
         nodes = {
             0: (distance_factor*0,   distance_factor*0, 0),
             1: (distance_factor*200, distance_factor*750, 0),
@@ -228,14 +228,14 @@ class PremadeScenarios:
     def two_slopes():
         G = nx.Graph()
         nodes = {
-            0: (-600,    0, 0),      # Start flat
-            1: (-300, 0, 0),       # Flat finish continues
-            2: (0,  0, 0),      # Longer flat section at start
-            3: (500,  0, 100),    # Slope up ends (plateau begins)
-            4: (1600, 0, 100),    # Plateau ends (~1100 m from node 2)
-            5: (2100, 0, 0),      # Slope down begins (3700 m slope, too long for driving)
-            6: (2400, 0, 0),      # Flat finish begins
-            7: (2700, 0, 0)       # Flat finish continues
+            0: (-600, 0, 0),
+            1: (-300, 0, 0),
+            2: (0, 0, 0),
+            3: (500, 0, 100),
+            4: (600, 0, 100),
+            5: (1800, 0, 0),
+            6: (2100, 0, 0),
+            7: (2400, 0, 0)
         }
         for node, (x, y, z) in nodes.items():
             G.add_node(node, x=x, y=y, height=z)
@@ -257,11 +257,11 @@ class PremadeScenarios:
         Returns a dictionary mapping scenario names to the generated graphs.
         """
         return {
-            "straight_grass": cls.straight_grass(),
-            "straight_water": cls.straight_water(),
-            "fly_up_cliff": cls.fly_up_cliff(),
-            "two_slopes": cls.two_slopes(),
-            "scenario_0": cls.scenario_0(),
+            # "straight_grass": cls.straight_grass(),
+            # "straight_water": cls.straight_water(),
+            # "fly_up_cliff": cls.fly_up_cliff(),
+            # "two_slopes": cls.two_slopes(),
+            # "scenario_0": cls.scenario_0(),
             "scenario_1": cls.scenario_1(),
             # "scenario_2": cls.scenario_2(),
         }
