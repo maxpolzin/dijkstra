@@ -1,31 +1,37 @@
 # %%
     
-    # DONE
-    # distributions change/sensitityv w.r.t map/scenario variation
-        # add scenario for straight path on grass
-        # add sceanrio for straight path on water
-        # add scenario where we have to fly up a cliff (without rolling)
-        # add scenario with two slopes
-        
-        # 3 random ones from a maps
+# distributions change/sensitityv w.r.t map/scenario variation
+    # add scenario for straight path on grass
+    # add sceanrio for straight path on water
+    # add scenario where we have to fly up a cliff (without rolling)
+    # add scenario with two slopes
+    
+    # 3 random ones from a maps
 
 
-    # sensitivity to robot/parameter changes
-        # delta 12 parameters
+# sensitivity to robot/parameter changes
+    # delta 12 parameters
 
-        # take all above scenarios, 
-        # look at the paths of the pareto front
-        # vary one parameter at a time, 
-        # see how energy, time, mode change second pareto front 
-        # makes correspondece between good paths in both runs
+    # take all above scenarios, 
+    # look at the paths of the pareto front
+    # vary one parameter at a time, 
+    # see how energy, time, mode change second pareto front 
+    # makes correspondece between good paths in both runs
 
-    # sensitivity to multimodality
-        # take each scenario
-        # get the pareto points, min time and min energy, no. solutions
-        # remove each modality afterwards
-        # recalculate metrics
-        # result is a table scenario 1,2,3,4 vs. no mode
-        # no flying, no rolling, no swimming, no driving, no recharging
+# sensitivity to multimodality
+    # take each scenario
+    # get the pareto points, min time and min energy, no. solutions
+    # remove each modality afterwards
+    # recalculate metrics
+    # result is a table scenario 1,2,3,4 vs. no mode
+    # no flying, no rolling, no swimming, no driving, no recharging
+
+
+# how to select good costs and how does that change the path
+# time in motion / resting
+# minimal distance vs. minimal time
+# how to quantify risk?
+
 
 
 
@@ -44,7 +50,7 @@ import networkx as nx
 from joblib import Memory, Parallel, delayed
 
 # Imports from your modules
-from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths, analyze_paths, compute_pareto_front
+from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths, analyze_paths, compute_pareto_front, build_layered_graph
 from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars, visualize_param_variations
 
 
@@ -132,7 +138,7 @@ def compute_for_scenario(name, graph, constants):
 # %%
 
 import pickle
-from dijkstra_scenario import build_world_graph, build_layered_graph, PremadeScenarios
+from dijkstra_scenario import PremadeScenarios
 
 all_scenarios = PremadeScenarios.get_all()
 all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
@@ -160,7 +166,7 @@ if os.path.exists(pickle_file) and not recompute:
 else:
     print("Computing all_results...")
    
-    all_results_list = Parallel(n_jobs=12)(
+    all_results_list = Parallel(n_jobs=-1)(
         delayed(process_variation)(idx, var_constants)
         for idx, var_constants in enumerate(all_variations)
     )

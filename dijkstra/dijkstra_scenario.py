@@ -13,6 +13,298 @@ import numpy as np
 
 from dijkstra_visualize import visualize_world_with_multiline_3D, visualize_world_and_graph
 
+class PremadeScenarios:
+    @staticmethod
+    def scenario_0():
+        # Predefined scenario 0
+        distance_factor = 1.5
+        nodes = {
+            0: (0 * distance_factor,    0 * distance_factor, 0),       # (0, 0, 0)
+            1: (100 * distance_factor,  0 * distance_factor, 0),       # (150, 0, 0)
+            2: (100 * distance_factor,  100 * distance_factor, 100),    # (150, 150, 100)
+            3: (200 * distance_factor,  100 * distance_factor, 100),    # (300, 150, 100)
+            4: (100 * distance_factor,  200 * distance_factor, 0),      # (150, 300, 0)
+            5: (200 * distance_factor,  200 * distance_factor, 0),      # (300, 300, 0)
+            6: (300 * distance_factor,  200 * distance_factor, 100),    # (450, 300, 100)
+            7: (300 * distance_factor,  300 * distance_factor, 100),    # (450, 450, 100)
+        }
+        edges = [
+            (0, 1, "grass"),
+            (2, 3, "grass"),
+            (3, 6, "grass"),
+            (6, 7, "grass"),
+            (1, 4, "water"),
+            (4, 5, "water"),
+            (1, 2, "slope"),
+            (5, 6, "slope"),
+            (3, 5, "cliff"),
+        ]
+        G = nx.Graph()
+        for node, coordinates in nodes.items():
+            x, y, z = coordinates
+            G.add_node(node, x=x, y=y, height=z)
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
+        print("Built scenario 0.")
+        return G
+
+    @staticmethod
+    def scenario_1():
+        # Predefined scenario 1
+        distance_factor = 2
+        nodes = {
+            0: (distance_factor*0,   distance_factor*0, 0),
+            1: (distance_factor*200, distance_factor*750, 0),
+            2: (distance_factor*200, distance_factor*900, 100),
+            3: (distance_factor*400, distance_factor*400, 0),
+            4: (distance_factor*800, distance_factor*800, 100),
+            5: (distance_factor*800, distance_factor*500, 100),
+            6: (distance_factor*810, distance_factor*500, 0),
+            7: (distance_factor*1000, distance_factor*300, 0),
+        }
+        edges = [
+            (0, 1, "grass"),
+            (4, 2, "grass"),
+            (6, 7, "grass"),
+            (3, 1, "grass"),
+            (4, 5, "water"),
+            (1, 2, "cliff"),
+            (5, 6, "cliff"),
+            (3, 5, "slope"),
+            (3, 0, "water"),
+            (4, 7, "cliff"),
+            (4, 6, "cliff"),
+            (3, 4, "slope"),
+            (5, 7, "cliff"),
+        ]
+        G = nx.Graph()
+        for node, coordinates in nodes.items():
+            x, y, z = coordinates
+            G.add_node(node, x=x, y=y, height=z)
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
+        print("Built scenario 1.")
+        return G
+
+    @staticmethod
+    def scenario_2():
+        # Predefined scenario 2 (using a hard-coded example)
+        nodes = {
+            0: (0.0, 0.0, 0),
+            7: (1000.0, 1000.0, 0),
+            6: (200.0, 800.0, 0),
+            2: (800.0, 200.0, 0),
+            1: (721.0, 479.0, 0),
+            3: (138.100794, 405.045027, 100),
+            4: (734.159254, 473.239449, 100),
+            5: (384.04, 409.134085, 0)
+        }
+        edges = [
+            (0, 3, "slope", 439.469342),
+            (7, 1, "grass", 591.000846),
+            (7, 4, "slope", 598.454660),
+            (6, 3, "slope", 412.093367),
+            (6, 4, "slope", 634.112424),
+            (6, 5, "water", 432.026487),
+            (5, 2, "water", 465.574685),
+            (2, 1, "grass", 289.968964),
+            (1, 4, "cliff", 101.026481),
+            (3, 5, "slope", 265.523659),
+            (4, 5, "slope", 369.720151)
+        ]
+        G = nx.Graph()
+        for node, (x, y, height) in nodes.items():
+            G.add_node(node, x=x, y=y, height=height)
+        for u, v, terrain, distance in edges:
+            G.add_edge(u, v, terrain=terrain, distance=distance)
+        print("Built scenario 2.")
+        return G
+
+    @staticmethod
+    def straight_grass():
+        G = nx.Graph()
+        nodes = {
+            0: (0, 0, 0),
+            1: (250, 0, 0),
+            2: (500, 0, 0),
+            3: (750, 0, 0),
+            4: (1000, 0, 0),
+            5: (1250, 0, 0),
+            6: (1500, 0, 0),
+            7: (1750, 0, 0)
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        for i in range(7):
+            G.add_edge(i, i+1, terrain="grass")
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
+        print("Built scenario 'straight_grass'.")
+        return G
+
+    @staticmethod
+    def straight_water():
+        G = nx.Graph()
+        nodes = {
+            0: (0, 0, 0),
+            1: (250, 0, 0),
+            2: (500, 0, 0),
+            3: (750, 0, 0),
+            4: (1000, 0, 0),
+            5: (1250, 0, 0),
+            6: (1500, 0, 0),
+            7: (1750, 0, 0)
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        for i in range(7):
+            G.add_edge(i, i+1, terrain="water")
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
+        print("Built scenario 'straight_water'.")
+        return G
+
+    @staticmethod
+    def fly_up_cliff():
+        G = nx.Graph()
+        nodes = {
+            0: (0, 0, 0),       # flat ground
+            1: (450, 0, 0),     # flat ground
+            2: (450, 0, 100),   # cliff up
+            3: (600, 0, 100),   # flat top
+            4: (600, 0, 0),     # cliff down
+            5: (750, 0, 0),     # flat bottom
+            6: (750, 0, 100),   # cliff up
+            7: (1200, 0, 100) 
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        edges = [
+            (0, 1, "grass"),
+            (1, 2, "cliff"),
+            (2, 3, "grass"),
+            (3, 4, "cliff"),
+            (4, 5, "grass"),
+            (5, 6, "cliff"),
+            (6, 7, "grass")
+        ]
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
+        print("Built scenario 'fly_up_cliff'.")
+        return G
+
+    @staticmethod
+    def two_slopes():
+        G = nx.Graph()
+        nodes = {
+            0: (-600,    0, 0),      # Start flat
+            1: (-300, 0, 0),       # Flat finish continues
+            2: (0,  0, 0),      # Longer flat section at start
+            3: (500,  0, 100),    # Slope up ends (plateau begins)
+            4: (1600, 0, 100),    # Plateau ends (~1100 m from node 2)
+            5: (2100, 0, 0),      # Slope down begins (3700 m slope, too long for driving)
+            6: (2400, 0, 0),      # Flat finish begins
+            7: (2700, 0, 0)       # Flat finish continues
+        }
+        for node, (x, y, z) in nodes.items():
+            G.add_node(node, x=x, y=y, height=z)
+        for i in range(7):
+            G.add_edge(i, i+1, terrain="slope")
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
+        print("Built scenario 'two_slopes'.")
+        return G
+
+    @classmethod
+    def get_all(cls):
+        """
+        Returns a dictionary mapping scenario names to the generated graphs.
+        """
+        return {
+            "straight_grass": cls.straight_grass(),
+            "straight_water": cls.straight_water(),
+            "fly_up_cliff": cls.fly_up_cliff(),
+            "two_slopes": cls.two_slopes(),
+            "scenario_0": cls.scenario_0(),
+            "scenario_1": cls.scenario_1(),
+            # "scenario_2": cls.scenario_2(),
+        }
+
+
+
+
+
+
+
+def build_world():
+    dem = np.zeros((1000, 1000))
+    terrain = np.full((1000, 1000), 'grass', dtype=object)
+
+    river_start_x = 200
+    river_end_x   = 350
+    river_start_y = 0
+    river_end_y   = 700
+    dem[river_start_y:river_end_y, river_start_x:river_end_x] = 0
+    terrain[river_start_y:river_end_y, river_start_x:river_end_x] = 'water'
+
+    plateau_start_y = 800
+    plateau_end_y   = 1000
+    plateau_start_x = 0
+    plateau_end_x   = 850
+    dem[plateau_start_y:plateau_end_y, plateau_start_x:plateau_end_x] = 100
+
+    slope_start_x = 400
+    slope_end_x   = 700
+    slope_start_y = 0
+    slope_end_y   = 800
+    for col in range(slope_start_x, slope_end_x):
+        slope_height = ((col - slope_start_x + 1) / (slope_end_x - slope_start_x)) * 100
+        dem[slope_start_y:slope_end_y, col] = slope_height
+
+    flat_start_x = 700
+    flat_end_x   = 850
+    last_slope_height = dem[:, slope_end_x - 1].copy()
+    dem[:, flat_start_x:flat_end_x] = last_slope_height[:, np.newaxis]
+
+    return dem, terrain
+
+
 
 def determine_edge_attributes(u, v, G):
     """
@@ -293,369 +585,6 @@ def build_world_graph():
     return generate_landscape_graph()
 
 
-class PremadeScenarios:
-    @staticmethod
-    def scenario_0():
-        # Predefined scenario 0
-        distance_factor = 2 #8
-        nodes = {
-            0: (0 * distance_factor,    0 * distance_factor, 0),       # (0, 0, 0)
-            1: (100 * distance_factor,  0 * distance_factor, 0),       # (150, 0, 0)
-            2: (100 * distance_factor,  100 * distance_factor, 100),    # (150, 150, 100)
-            3: (200 * distance_factor,  100 * distance_factor, 100),    # (300, 150, 100)
-            4: (100 * distance_factor,  200 * distance_factor, 0),      # (150, 300, 0)
-            5: (200 * distance_factor,  200 * distance_factor, 0),      # (300, 300, 0)
-            6: (300 * distance_factor,  200 * distance_factor, 100),    # (450, 300, 100)
-            7: (300 * distance_factor,  300 * distance_factor, 100),    # (450, 450, 100)
-        }
-        edges = [
-            (0, 1, "grass"),
-            (2, 3, "grass"),
-            (3, 6, "grass"),
-            (6, 7, "grass"),
-            (1, 4, "water"),
-            (4, 5, "water"),
-            (1, 2, "slope"),
-            (5, 6, "slope"),
-            (3, 5, "cliff"),
-        ]
-        G = nx.Graph()
-        for node, coordinates in nodes.items():
-            x, y, z = coordinates
-            G.add_node(node, x=x, y=y, height=z)
-        for (u, v, terrain) in edges:
-            G.add_edge(u, v, terrain=terrain)
-        for (u, v) in G.edges():
-            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
-            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
-            dx = x_u - x_v
-            dy = y_u - y_v
-            dz = z_u - z_v
-            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
-        print("Built scenario 0.")
-        return G
-
-    @staticmethod
-    def scenario_1():
-        # Predefined scenario 1
-        distance_factor = 4 #8
-        nodes = {
-            0: (distance_factor*0,   distance_factor*0, 0),
-            1: (distance_factor*200, distance_factor*900, 0),
-            2: (distance_factor*200, distance_factor*900, 100),
-            3: (distance_factor*400, distance_factor*400, 0),
-            4: (distance_factor*800, distance_factor*800, 100),
-            5: (distance_factor*800, distance_factor*500, 100),
-            6: (distance_factor*810, distance_factor*500, 0),
-            7: (distance_factor*1000, distance_factor*300, 0),
-        }
-        edges = [
-            (0, 1, "grass"),
-            (4, 2, "grass"),
-            (6, 7, "grass"),
-            (3, 1, "grass"),
-            (4, 5, "water"),
-            (1, 2, "cliff"),
-            (5, 6, "cliff"),
-            (3, 5, "slope"),
-            (3, 0, "water"),
-            (4, 7, "cliff"),
-            (4, 6, "cliff"),
-            (3, 4, "slope"),
-            (5, 7, "cliff"),
-        ]
-        G = nx.Graph()
-        for node, coordinates in nodes.items():
-            x, y, z = coordinates
-            G.add_node(node, x=x, y=y, height=z)
-        for (u, v, terrain) in edges:
-            G.add_edge(u, v, terrain=terrain)
-        for (u, v) in G.edges():
-            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
-            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
-            dx = x_u - x_v
-            dy = y_u - y_v
-            dz = z_u - z_v
-            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
-        print("Built scenario 1.")
-        return G
-
-    @staticmethod
-    def scenario_2():
-        # Predefined scenario 2 (using a hard-coded example)
-        nodes = {
-            0: (0.0, 0.0, 0),
-            7: (1000.0, 1000.0, 0),
-            6: (200.0, 800.0, 0),
-            2: (800.0, 200.0, 0),
-            1: (721.0, 479.0, 0),
-            3: (138.100794, 405.045027, 100),
-            4: (734.159254, 473.239449, 100),
-            5: (384.04, 409.134085, 0)
-        }
-        edges = [
-            (0, 3, "slope", 439.469342),
-            (7, 1, "grass", 591.000846),
-            (7, 4, "slope", 598.454660),
-            (6, 3, "slope", 412.093367),
-            (6, 4, "slope", 634.112424),
-            (6, 5, "water", 432.026487),
-            (5, 2, "water", 465.574685),
-            (2, 1, "grass", 289.968964),
-            (1, 4, "cliff", 101.026481),
-            (3, 5, "slope", 265.523659),
-            (4, 5, "slope", 369.720151)
-        ]
-        G = nx.Graph()
-        for node, (x, y, height) in nodes.items():
-            G.add_node(node, x=x, y=y, height=height)
-        for u, v, terrain, distance in edges:
-            G.add_edge(u, v, terrain=terrain, distance=distance)
-        print("Built scenario 2.")
-        return G
-
-    @staticmethod
-    def straight_grass():
-        G = nx.Graph()
-        nodes = {
-            0: (0, 0, 0),
-            1: (250, 0, 0),
-            2: (500, 0, 0),
-            3: (750, 0, 0),
-            4: (1000, 0, 0),
-            5: (1250, 0, 0),
-            6: (1500, 0, 0),
-            7: (1750, 0, 0)
-        }
-        for node, (x, y, z) in nodes.items():
-            G.add_node(node, x=x, y=y, height=z)
-        for i in range(7):
-            G.add_edge(i, i+1, terrain="grass")
-        for (u, v) in G.edges():
-            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
-            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
-            dx = x_u - x_v
-            dy = y_u - y_v
-            dz = z_u - z_v
-            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
-        print("Built scenario 'straight_grass'.")
-        return G
-
-    @staticmethod
-    def straight_water():
-        G = nx.Graph()
-        nodes = {
-            0: (0, 0, 0),
-            1: (250, 0, 0),
-            2: (500, 0, 0),
-            3: (750, 0, 0),
-            4: (1000, 0, 0),
-            5: (1250, 0, 0),
-            6: (1500, 0, 0),
-            7: (1750, 0, 0)
-        }
-        for node, (x, y, z) in nodes.items():
-            G.add_node(node, x=x, y=y, height=z)
-        for i in range(7):
-            G.add_edge(i, i+1, terrain="water")
-        for (u, v) in G.edges():
-            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
-            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
-            dx = x_u - x_v
-            dy = y_u - y_v
-            dz = z_u - z_v
-            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
-        print("Built scenario 'straight_water'.")
-        return G
-
-    @staticmethod
-    def fly_up_cliff():
-        G = nx.Graph()
-        nodes = {
-            0: (0, 0, 0),       # flat ground
-            1: (450, 0, 0),     # flat ground
-            2: (450, 0, 100),   # cliff up
-            3: (600, 0, 100),   # flat top
-            4: (600, 0, 0),     # cliff down
-            5: (750, 0, 0),     # flat bottom
-            6: (750, 0, 100),   # cliff up
-            7: (1200, 0, 100) 
-        }
-        for node, (x, y, z) in nodes.items():
-            G.add_node(node, x=x, y=y, height=z)
-        edges = [
-            (0, 1, "grass"),
-            (1, 2, "cliff"),
-            (2, 3, "grass"),
-            (3, 4, "cliff"),
-            (4, 5, "grass"),
-            (5, 6, "cliff"),
-            (6, 7, "grass")
-        ]
-        for (u, v, terrain) in edges:
-            G.add_edge(u, v, terrain=terrain)
-        for (u, v) in G.edges():
-            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
-            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
-            dx = x_u - x_v
-            dy = y_u - y_v
-            dz = z_u - z_v
-            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
-        print("Built scenario 'fly_up_cliff'.")
-        return G
-
-    @staticmethod
-    def two_slopes():
-        G = nx.Graph()
-        nodes = {
-            0: (-600,    0, 0),      # Start flat
-            1: (-300, 0, 0),       # Flat finish continues
-            2: (0,  0, 0),      # Longer flat section at start
-            3: (500,  0, 100),    # Slope up ends (plateau begins)
-            4: (1600, 0, 100),    # Plateau ends (~1100 m from node 2)
-            5: (2100, 0, 0),      # Slope down begins (3700 m slope, too long for driving)
-            6: (2400, 0, 0),      # Flat finish begins
-            7: (2700, 0, 0)       # Flat finish continues
-        }
-        for node, (x, y, z) in nodes.items():
-            G.add_node(node, x=x, y=y, height=z)
-        for i in range(7):
-            G.add_edge(i, i+1, terrain="slope")
-        for (u, v) in G.edges():
-            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
-            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
-            dx = x_u - x_v
-            dy = y_u - y_v
-            dz = z_u - z_v
-            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
-        print("Built scenario 'two_slopes'.")
-        return G
-
-    @classmethod
-    def get_all(cls):
-        """
-        Returns a dictionary mapping scenario names to the generated graphs.
-        """
-        return {
-            "straight_grass": cls.straight_grass(),
-            "straight_water": cls.straight_water(),
-            "fly_up_cliff": cls.fly_up_cliff(),
-            "two_slopes": cls.two_slopes(),
-            "scenario_0": cls.scenario_0(),
-            "scenario_1": cls.scenario_1(),
-            # "scenario_2": cls.scenario_2(),
-        }
-
-
-
-def get_edge_parameters(mode, terrain, h1, h2, dist, power, speed, constants):
-    travel_time = dist / speed
-    energy_Wh = (power * travel_time) / 3600.0
-    is_feasible = False
-
-    if mode == 'fly':
-        is_feasible = True
-    if terrain == 'water' and mode == 'swim':
-        is_feasible = True
-    if terrain == 'slope':
-        if mode == 'drive':
-            is_feasible = True
-        elif mode == 'roll':
-            is_feasible = (h1 == 100 and h2 == 0)
-    if terrain == 'grass' and mode == 'drive':
-        is_feasible = True
-
-    is_feasible = is_feasible and not exceeds_battery_capacity(energy_Wh, constants['BATTERY_CAPACITY'])
-    
-    if is_feasible:
-        return (travel_time, energy_Wh)
-
-    return None
-
-
-def exceeds_battery_capacity(energy_wh, battery_capacity):
-    return energy_wh > battery_capacity
-
-
-def build_layered_graph(G_world, constants):
-    modes = constants['MODES']
-    
-    L = nx.DiGraph()
-    modes_list = list(modes.keys())
-    
-    for v in G_world.nodes():
-        for m in modes_list:
-            L.add_node((v, m), height=G_world.nodes[v]['height'])
-    
-    for (u, v) in G_world.edges():
-        dist = G_world[u][v]['distance']
-        terr = G_world[u][v]['terrain']
-        height_u = G_world.nodes[u]['height']
-        height_v = G_world.nodes[v]['height']
-        
-        for mode in modes_list:
-            forward_edge = get_edge_parameters(mode, terr, height_u, height_v, dist, modes[mode]['power'], modes[mode]['speed'], constants)
-            if forward_edge is not None: 
-                L.add_edge((u, mode), (v, mode), time=forward_edge[0], energy_Wh=forward_edge[1], terrain=terr, distance=dist)
-            backward_edge = get_edge_parameters(mode, terr, height_v, height_u, dist, modes[mode]['power'], modes[mode]['speed'], constants)
-            if backward_edge is not None:
-                L.add_edge((v, mode), (u, mode), time=backward_edge[0], energy_Wh=backward_edge[1], terrain=terr, distance=dist)
-
-    for node in G_world.nodes():
-        for m1 in modes_list:
-            for m2 in modes_list:
-                if m1 != m2:
-                    switch_energy_wh = constants['SWITCH_ENERGY']
-                    switch_time = constants['SWITCH_TIME']
-                    if not exceeds_battery_capacity(switch_energy_wh, constants['BATTERY_CAPACITY']):
-                        L.add_edge((node, m1), (node, m2),
-                                   time=switch_time,
-                                   energy_Wh=switch_energy_wh,
-                                   terrain='switch',
-                                   distance=0)
-
-    return L
-
-
-
-
-
-
-
-
-
-
-def build_world():
-    dem = np.zeros((1000, 1000))
-    terrain = np.full((1000, 1000), 'grass', dtype=object)
-
-    river_start_x = 200
-    river_end_x   = 350
-    river_start_y = 0
-    river_end_y   = 700
-    dem[river_start_y:river_end_y, river_start_x:river_end_x] = 0
-    terrain[river_start_y:river_end_y, river_start_x:river_end_x] = 'water'
-
-    plateau_start_y = 800
-    plateau_end_y   = 1000
-    plateau_start_x = 0
-    plateau_end_x   = 850
-    dem[plateau_start_y:plateau_end_y, plateau_start_x:plateau_end_x] = 100
-
-    slope_start_x = 400
-    slope_end_x   = 700
-    slope_start_y = 0
-    slope_end_y   = 800
-    for col in range(slope_start_x, slope_end_x):
-        slope_height = ((col - slope_start_x + 1) / (slope_end_x - slope_start_x)) * 100
-        dem[slope_start_y:slope_end_y, col] = slope_height
-
-    flat_start_x = 700
-    flat_end_x   = 850
-    last_slope_height = dem[:, slope_end_x - 1].copy()
-    dem[:, flat_start_x:flat_end_x] = last_slope_height[:, np.newaxis]
-
-    return dem, terrain
 
 
 
