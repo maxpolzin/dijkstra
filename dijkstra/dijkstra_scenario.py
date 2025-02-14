@@ -17,7 +17,7 @@ class PremadeScenarios:
     @staticmethod
     def scenario_0():
         # Predefined scenario 0
-        distance_factor = 1.5
+        distance_factor = 2.5
         nodes = {
             0: (0 * distance_factor,    0 * distance_factor, 0),       # (0, 0, 0)
             1: (100 * distance_factor,  0 * distance_factor, 0),       # (150, 0, 0)
@@ -261,8 +261,8 @@ class PremadeScenarios:
             # "straight_water": cls.straight_water(),
             # "fly_up_cliff": cls.fly_up_cliff(),
             # "two_slopes": cls.two_slopes(),
-            # "scenario_0": cls.scenario_0(),
-            "scenario_1": cls.scenario_1(),
+            "scenario_0": cls.scenario_0(),
+            # "scenario_1": cls.scenario_1(),
             # "scenario_2": cls.scenario_2(),
         }
 
