@@ -388,6 +388,48 @@ def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
               prop={'size': 8}, title_fontsize=8)
 
 
+def describe_variation(baseline, variant):
+    differences = []
+    # Compare top-level numeric parameters (excluding MODES)
+    for key in baseline:
+        if key == "MODES":
+            continue
+        if isinstance(baseline[key], (int, float)):
+            if baseline[key] != variant[key]:
+                diff = (variant[key] - baseline[key]) / baseline[key] * 100
+                differences.append(f"{key} {'+' if diff >= 0 else ''}{int(round(diff))}%")
+    # Compare nested parameters in MODES
+    for mode in baseline["MODES"]:
+        for param in baseline["MODES"][mode]:
+            base_val = baseline["MODES"][mode][param]
+            var_val = variant["MODES"][mode][param]
+            if base_val != var_val:
+                diff = (var_val - base_val) / base_val * 100
+                differences.append(f"{mode.capitalize()} {param} {'+' if diff >= 0 else ''}{int(round(diff))}%")
+    return ", ".join(differences)
+
+
+def format_constants(constants):
+    battery_str = "Battery:({}s,{}Wh)".format(
+        int(round(constants["RECHARGE_TIME"])),
+        int(round(constants["BATTERY_CAPACITY"]))
+    )
+    switch_str = "Switch:({}s,{}Wh)".format(
+        int(round(constants["SWITCH_TIME"])),
+        int(round(constants["SWITCH_ENERGY"]))
+    )
+    mode_strs = []
+    for mode, vals in constants["MODES"].items():
+        mode_str = "{}:({}m/s,{}W)".format(
+            mode.capitalize(),
+            int(round(vals["speed"])),
+            int(round(vals["power"]))
+        )
+        mode_strs.append(mode_str)
+    return ", ".join([battery_str, switch_str] + mode_strs)
+
+
+
 def plot_basic_metrics(meta_paths, pareto_front, optimal_path):
     times = [m.total_time for m in meta_paths]
     energies = [m.total_energy for m in meta_paths]
@@ -418,29 +460,8 @@ def plot_basic_metrics(meta_paths, pareto_front, optimal_path):
     plt.show()
 
 
-def format_constants(constants):
-    battery_str = "Battery:({}s,{}Wh)".format(
-        int(round(constants["RECHARGE_TIME"])),
-        int(round(constants["BATTERY_CAPACITY"]))
-    )
-    switch_str = "Switch:({}s,{}Wh)".format(
-        int(round(constants["SWITCH_TIME"])),
-        int(round(constants["SWITCH_ENERGY"]))
-    )
-    mode_strs = []
-    for mode, vals in constants["MODES"].items():
-        mode_str = "{}:({}m/s,{}W)".format(
-            mode.capitalize(),
-            int(round(vals["speed"])),
-            int(round(vals["power"]))
-        )
-        mode_strs.append(mode_str)
-    return ", ".join([battery_str, switch_str] + mode_strs)
 
-
-
-def visualize_param_variations(all_results, selected_scenario, n_cols=3):
-    
+def visualize_param_variations(all_results, selected_scenario, n_cols=5):
     variation_keys = sorted([k for k, v in all_results.items() if selected_scenario in v["results"]])
     n_variations = len(variation_keys)
     if n_variations == 0:
@@ -464,15 +485,15 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
     global_xlim = (x_min - x_margin, x_max + x_margin)
     global_ylim = (y_min - y_margin, y_max + y_margin)
     
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(n_cols * 4, n_rows * 4), sharex=True, sharey=True)
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(n_cols * 5, n_rows * 5), sharex=True, sharey=True)
     axs = np.array(axs).flatten()
     
-    # Set main title with scenario name.
-    fig.suptitle(f"Scenario: {selected_scenario}", fontsize=14)
+    # Main title
+    fig.suptitle(f"Scenario: {selected_scenario}", fontsize=8)
     
     # Integrate constants info into the legend title.
     baseline_constants = all_results[0]["constants"]
-    legend_title = format_constants(baseline_constants) + "\n\nDominant Mode (by distance)"
+    legend_title = format_constants(baseline_constants) + "\nDominant Mode (by distance)"
     legend_elements = [
         Line2D([0], [0], marker='o', color='w', markerfacecolor=color,
                markersize=8, label=mode.capitalize())
@@ -509,7 +530,7 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
         ax.scatter(optimal_path.total_time, optimal_path.total_energy, marker='X', s=100, 
                    facecolors='none', edgecolors='black', zorder=10)
         
-        # Remove any legend from this subplot.
+        # Remove any subplot legend.
         leg = ax.get_legend()
         if leg is not None:
             leg.remove()
@@ -517,14 +538,18 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=3):
         ax.set_xlim(global_xlim)
         ax.set_ylim(global_ylim)
         
-        title = (f"Var {var} - Optimal: {optimal_path.total_time:.2f}s, "
-                 f"{optimal_path.total_energy:.2f}Wh")
-        ax.set_title(title)
+        variation_description = describe_variation(baseline_constants, var_constants)
+        title = (f"Var {var} ({variation_description}) - Optimal: "
+                 f"{optimal_path.total_time:.2f}s, {optimal_path.total_energy:.2f}Wh")                
+        ax.set_title(title, fontsize=8)
+        ax.tick_params(labelsize=8)
+        ax.set_xlabel(ax.get_xlabel(), fontsize=8)
+        ax.set_ylabel(ax.get_ylabel(), fontsize=8)
     
     for j in range(idx + 1, len(axs)):
         fig.delaxes(axs[j])
     
-    plt.tight_layout(rect=[0, 0, 1, 0.85])
+    plt.tight_layout(rect=[0, 0, 1, 0.87])
     plt.show()
 
 
