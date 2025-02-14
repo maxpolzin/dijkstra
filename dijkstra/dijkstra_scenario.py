@@ -100,9 +100,52 @@ class PremadeScenarios:
         print("Built scenario 1.")
         return G
 
+
     @staticmethod
     def scenario_2():
-        # Predefined scenario 2 (using a hard-coded example)
+        factor = 1.4
+        nodes = {
+            0: (factor*0,   factor*0, 0),
+            1: (factor*300, factor*200, 0),
+            2: (factor*-700, -factor*700, 0),
+            3: (factor*250, factor*707, 0),
+            4: (factor*700, -factor*200, 0),
+            5: (factor*-700, -factor*700, 100),
+            6: (factor*750, factor*707, 0),
+            7: (factor*1000, factor*0, 0),
+        }
+
+        edges = [
+            (0, 1, "water"),
+            (1, 4, "water"),
+            (4, 7, "water"),
+            (0, 3, "grass"),
+            (3, 6, "grass"),
+            (6, 7, "grass"),
+            (0, 2, "grass"),
+            (2, 5, "cliff"),
+            (5, 7, "slope"),
+        ]
+
+        G = nx.Graph()
+        for node, coordinates in nodes.items():
+            x, y, z = coordinates
+            G.add_node(node, x=x, y=y, height=z)
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
+        print("Built scenario 2.")
+        return G
+
+
+    @staticmethod
+    def scenario_3():
         nodes = {
             0: (0.0, 0.0, 0),
             7: (1000.0, 1000.0, 0),
@@ -131,7 +174,7 @@ class PremadeScenarios:
             G.add_node(node, x=x, y=y, height=height)
         for u, v, terrain, distance in edges:
             G.add_edge(u, v, terrain=terrain, distance=distance)
-        print("Built scenario 2.")
+        print("Built scenario 3.")
         return G
 
     @staticmethod
@@ -257,13 +300,13 @@ class PremadeScenarios:
         Returns a dictionary mapping scenario names to the generated graphs.
         """
         return {
-            "straight_grass": cls.straight_grass(),
-            "straight_water": cls.straight_water(),
-            "fly_up_cliff": cls.fly_up_cliff(),
-            "two_slopes": cls.two_slopes(),
-            "scenario_0": cls.scenario_0(),
-            "scenario_1": cls.scenario_1(),
-            # "scenario_2": cls.scenario_2(),
+            # "straight_grass": cls.straight_grass(),
+            # "straight_water": cls.straight_water(),
+            # "fly_up_cliff": cls.fly_up_cliff(),
+            # "two_slopes": cls.two_slopes(),
+            # "scenario_0": cls.scenario_0(),
+            # "scenario_1": cls.scenario_1(),
+            "scenario_2": cls.scenario_2(),
         }
 
 

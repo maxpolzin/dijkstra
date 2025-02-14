@@ -37,10 +37,10 @@
 
 # %%
 
-# %reload_ext autoreload
-# %autoreload 2
+%reload_ext autoreload
+%autoreload 2
 
-# %matplotlib widget
+%matplotlib widget
 
 import os
 import copy
@@ -141,7 +141,7 @@ import pickle
 from dijkstra_scenario import PremadeScenarios
 
 all_scenarios = PremadeScenarios.get_all()
-all_variations = list(SensitivityConstants(CONSTANTS, variation=0.2))
+all_variations = list(SensitivityConstants(CONSTANTS, variation=0.5)) # 0.2, 0.5
 
 
 def process_variation(idx, var_constants):
@@ -205,12 +205,12 @@ for scenario in all_scenarios:
 # all_results = {idx: data for idx, data in all_results_list}
 
 
-
+# %%
 ###############################################################################
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
 selected_variation = 0
-selected_scenario = "scenario_0"
+selected_scenario = "scenario_2"
 if selected_scenario in all_results[selected_variation]["results"]:
     constants = all_results[selected_variation]["constants"]
     data = all_results[selected_variation]["results"][selected_scenario]
@@ -220,13 +220,13 @@ if selected_scenario in all_results[selected_variation]["results"]:
     meta_paths = data["meta_paths"]
     pareto_front = data["pareto_front"]
 
-    # For example, visualize metrics for baseline:
+    # # For example, visualize metrics for baseline:
     visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="all_edges")
-    print("Optimal Path:")
-    print(optimal_path)
-    print("-----")
+    # print("Optimal Path:")
+    # print(optimal_path)
+    # print("-----")
 
-    plot_basic_metrics(meta_paths, pareto_front, optimal_path)
+    # plot_basic_metrics(meta_paths, pareto_front, optimal_path)
 else:
     print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
 
