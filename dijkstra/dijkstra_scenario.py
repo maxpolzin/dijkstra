@@ -353,6 +353,7 @@ class PremadeScenarios:
             "scenario_1": cls.scenario_1(),
             "scenario_2": cls.scenario_2(),
             "scenario_4": cls.scenario_4(),
+            "scenario_3": cls.scenario_3(),
         }
 
 

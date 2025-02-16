@@ -166,7 +166,7 @@ if os.path.exists(pickle_file) and not recompute:
 else:
     print("Computing all_results...")
    
-    all_results_list = Parallel(n_jobs=-1)(
+    all_results_list = Parallel(n_jobs=3)(
         delayed(process_variation)(idx, var_constants)
         for idx, var_constants in enumerate(all_variations)
     )
@@ -194,7 +194,7 @@ for scenario in all_scenarios:
 
 # For singel example scneario
 
-# name = "scenario_2"
+# name = "scenario_3"
 # graph = all_scenarios[name]
 # var_constants = all_variations[0]
 
@@ -210,7 +210,7 @@ for scenario in all_scenarios:
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
 selected_variation = 0
-selected_scenario = "scenario_4"
+selected_scenario = "scenario_3"
 if selected_scenario in all_results[selected_variation]["results"]:
     constants = all_results[selected_variation]["constants"]
     data = all_results[selected_variation]["results"][selected_scenario]
@@ -226,7 +226,7 @@ if selected_scenario in all_results[selected_variation]["results"]:
     print(optimal_path)
     print("-----")
 
-    # plot_basic_metrics(meta_paths, pareto_front, optimal_path)
+    plot_basic_metrics(meta_paths, pareto_front, optimal_path)
 else:
     print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
 
