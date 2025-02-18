@@ -3,20 +3,30 @@
 # distributions change/sensitityv w.r.t map/scenario variation
     # add scenario for straight path on grass
     # add sceanrio for straight path on water
-    # add scenario where we have to fly up a cliff (without rolling)
-    # add scenario with two slopes
-    
+    # add scenario with cliff
+    # add scenario with slopes
+
     # 3 random ones from a maps
+        # 1 same traveltime for all modes
+        # 1 same energy for all modes
+        # 1 where robot must recharge?
+        # 1 random one that shows complexity of scenarios
+
+# I can make scenarios that require each mode and or otherwise infeasible
+
 
 
 # sensitivity to robot/parameter changes
     # delta 12 parameters
-
     # take all above scenarios, 
     # look at the paths of the pareto front
     # vary one parameter at a time, 
-    # see how energy, time, mode change second pareto front 
+    # see how energy, time, mode change
     # makes correspondece between good paths in both runs
+
+
+
+
 
 # sensitivity to multimodality
     # take each scenario
@@ -25,6 +35,7 @@
     # recalculate metrics
     # result is a table scenario 1,2,3,4 vs. no mode
     # no flying, no rolling, no swimming, no driving, no recharging
+
 
 
 # how to select good costs and how does that change the path
