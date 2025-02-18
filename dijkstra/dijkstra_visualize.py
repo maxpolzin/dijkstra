@@ -364,6 +364,7 @@ def plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors):
     energies = np.array(energies)
     colors = np.array(colors)
     
+    pareto_mask = np.asarray(pareto_mask, dtype=bool)
     non_pareto_idx = ~pareto_mask
     if non_pareto_idx.sum() > 0:
         ax.scatter(times[non_pareto_idx], energies[non_pareto_idx],
@@ -478,13 +479,19 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=5):
         energies = [m.total_energy for m in meta_paths]
         all_times.extend(times)
         all_energies.extend(energies)
-    x_min, x_max = min(all_times), max(all_times)
-    y_min, y_max = min(all_energies), max(all_energies)
-    x_margin = 0.05 * (x_max - x_min) if x_max > x_min else 1
-    y_margin = 0.05 * (y_max - y_min) if y_max > y_min else 1
-    global_xlim = (x_min - x_margin, x_max + x_margin)
-    global_ylim = (y_min - y_margin, y_max + y_margin)
-    
+
+    if not all_times or not all_energies:
+        print(f"No valid paths found for scenario '{selected_scenario}' in any variation. Plotting empty plots.")
+        global_xlim = (0, 1)
+        global_ylim = (0, 1)
+    else:
+        x_min, x_max = min(all_times), max(all_times)
+        y_min, y_max = min(all_energies), max(all_energies)
+        x_margin = 0.05 * (x_max - x_min) if x_max > x_min else 1
+        y_margin = 0.05 * (y_max - y_min) if y_max > y_min else 1
+        global_xlim = (x_min - x_margin, x_max + x_margin)
+        global_ylim = (y_min - y_margin, y_max + y_margin)
+
     fig, axs = plt.subplots(n_rows, n_cols, figsize=(n_cols * 5, n_rows * 5), sharex=True, sharey=True)
     axs = np.array(axs).flatten()
     
@@ -522,13 +529,14 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=5):
             else:
                 colors.append('blue')
         
-        pareto_mask = np.array([m in pareto_front for m in meta_paths])
-        
+        pareto_mask = np.array([m in pareto_front for m in meta_paths]) if meta_paths else np.array([])
+
         plot_scatter_paths(times, energies, colors, pareto_mask, ax, mode_colors)
         
         # Plot the optimal path with a red X marker.
-        ax.scatter(optimal_path.total_time, optimal_path.total_energy, marker='X', s=100, 
-                   facecolors='none', edgecolors='black', zorder=10)
+        if optimal_path is not None and hasattr(optimal_path, 'total_time') and hasattr(optimal_path, 'total_energy'):
+            ax.scatter(optimal_path.total_time, optimal_path.total_energy, marker='X', s=100, 
+                       facecolors='none', edgecolors='black', zorder=10)
         
         # Remove any subplot legend.
         leg = ax.get_legend()
@@ -539,8 +547,11 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=5):
         ax.set_ylim(global_ylim)
         
         variation_description = describe_variation(baseline_constants, var_constants)
-        title = (f"Var {var} ({variation_description}) - Optimal: "
-                 f"{optimal_path.total_time:.2f}s, {optimal_path.total_energy:.2f}Wh")                
+        if optimal_path is not None and hasattr(optimal_path, 'total_time') and hasattr(optimal_path, 'total_energy'):
+            title = (f"Var {var} ({variation_description}) - Optimal: "
+                     f"{optimal_path.total_time:.2f}s, {optimal_path.total_energy:.2f}Wh")
+        else:
+            title = f"Var {var} ({variation_description}) - No optimal path"              
         ax.set_title(title, fontsize=8)
         ax.tick_params(labelsize=8)
         ax.set_xlabel(ax.get_xlabel(), fontsize=8)
@@ -550,7 +561,7 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=5):
         fig.delaxes(axs[j])
     
     plt.tight_layout(rect=[0, 0, 1, 0.87])
-    plt.show()
+    plt.show(block=False)
 
 
 
