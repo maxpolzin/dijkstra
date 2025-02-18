@@ -22,16 +22,18 @@ def timed(func):
 # Core Classes
 #########################################
 
+
 class State:
-    def __init__(self, node, mode, cum_energy, cum_time):
+    def __init__(self, node, mode, cum_energy, cum_time, remaining_battery):
         self.node = node
         self.mode = mode
         self.cum_energy = cum_energy  # Total energy consumed (Wh)
         self.cum_time = cum_time      # Total time elapsed (s)
+        self.remaining_battery = remaining_battery  
         self.cost = None
         self.predecessor = None
         self.did_recharge = False
-        self.recharge_time = 0.0  # New attribute to store recharge duration
+        self.recharge_time = 0.0  # Stores recharge duration
 
     def compute_cost(self, energy_vs_time):
         self.cost = (1 - energy_vs_time) * self.cum_time + energy_vs_time * self.cum_energy
@@ -42,7 +44,9 @@ class State:
 
     def __repr__(self):
         return (f"State(node={self.node}, mode={self.mode}, cum_energy={self.cum_energy:.2f}, "
-                f"cum_time={self.cum_time:.2f}, cost={self.cost:.2f})")
+                f"cum_time={self.cum_time:.2f}, remaining_battery={self.remaining_battery:.2f}, "
+                f"cost={self.cost:.2f})")
+
 
 class Path:
     def __init__(self, state_chain):
@@ -152,10 +156,9 @@ class MetaPath:
             curr_state = self.state_chain[i]
 
             dE = curr_state.cum_energy - prev_state.cum_energy
-            remaining_battery = battery_remaining(prev_state, constants)
 
             if curr_state.did_recharge:
-                recharge_time = (constants['BATTERY_CAPACITY'] - remaining_battery) / constants['BATTERY_CAPACITY'] * constants['RECHARGE_TIME']
+                recharge_time = (constants['BATTERY_CAPACITY'] - prev_state.remaining_battery) / constants['BATTERY_CAPACITY'] * constants['RECHARGE_TIME']
                 self.mode_times['recharging'] = self.mode_times.get('recharging', 0) + recharge_time
                 dt = curr_state.cum_time - prev_state.cum_time - recharge_time
             else:
@@ -187,39 +190,35 @@ class MetaPath:
 # Helper Functions (Eliminate Duplication)
 #########################################
 
-def battery_remaining(current_state, constants):
-    if current_state.cum_energy == 0.0:
-        return constants['BATTERY_CAPACITY']
-    elif current_state.cum_energy % constants['BATTERY_CAPACITY'] == 0:
-        return 0.0
-    else:
-        return constants['BATTERY_CAPACITY'] - (current_state.cum_energy % constants['BATTERY_CAPACITY'])
-
 
 def compute_edge_transition(current_state, edge_data, constants):
     edge_time = edge_data['time']
     edge_energy = edge_data['energy_Wh']
-    remaining = battery_remaining(current_state, constants)
+    
+    battery_capacity = constants['BATTERY_CAPACITY']
+    old_remaining = current_state.remaining_battery
 
-    if edge_energy <= remaining:
+    if edge_energy <= old_remaining:
+        new_remaining = old_remaining - edge_energy
         new_cum_energy = current_state.cum_energy + edge_energy
         new_cum_time = current_state.cum_time + edge_time
         did_recharge = False
         recharge_time = 0.0
     else:
-        recharge_time_adjusted = (1 - remaining / constants['BATTERY_CAPACITY']) * constants['RECHARGE_TIME']
+        recharge_time_adjusted = (1 - old_remaining / battery_capacity) * constants['RECHARGE_TIME']
+        new_remaining = battery_capacity - edge_energy
         new_cum_energy = current_state.cum_energy + edge_energy
         new_cum_time = current_state.cum_time + recharge_time_adjusted + edge_time
         did_recharge = True
         recharge_time = recharge_time_adjusted
 
-    return new_cum_energy, new_cum_time, did_recharge, recharge_time
+    return new_cum_energy, new_cum_time, did_recharge, recharge_time, new_remaining
+
 
 def build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg=False):
     state_chain = []
-    # The first tuple in path is the starting state.
     start_node, start_mode = path[0]
-    initial_state = State(start_node, start_mode, cum_energy=0.0, cum_time=0.0)
+    initial_state = State(start_node, start_mode, cum_energy=0.0, cum_time=0.0, remaining_battery=constants['BATTERY_CAPACITY'])
     initial_state.compute_cost(energy_vs_time)
     state_chain.append(initial_state)
     current_state = initial_state
@@ -234,8 +233,9 @@ def build_state_chain_from_simple_path(path, L, energy_vs_time, constants, dbg=F
             return None
 
         edge_data = L[prev_tuple][curr_tuple]
-        new_cum_energy, new_cum_time, did_recharge, recharge_time = compute_edge_transition(current_state, edge_data, constants)
-        new_state = State(curr_tuple[0], curr_tuple[1], new_cum_energy, new_cum_time)
+        # Unpack the new remaining battery as well.
+        new_cum_energy, new_cum_time, did_recharge, recharge_time, new_remaining = compute_edge_transition(current_state, edge_data, constants)
+        new_state = State(curr_tuple[0], curr_tuple[1], new_cum_energy, new_cum_time, remaining_battery=new_remaining)
         new_state.predecessor = current_state
         new_state.did_recharge = did_recharge
         new_state.recharge_time = recharge_time
@@ -332,19 +332,15 @@ def build_layered_graph(G_world, constants):
 
 
 def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_time, dbg=False):
-    # A helper that determines if state s1 dominates state s2.
     def dominates(s1, s2):
         t1, t2 = s1.cum_time, s2.cum_time
-        b1, b2 = battery_remaining(s1, constants), battery_remaining(s2, constants)
-        # s1 dominates s2 if it has lower (or equal) time AND higher (or equal) battery,
-        # with at least one strictly better.
+        b1, b2 = s1.remaining_battery, s2.remaining_battery
         return (t1 <= t2 and b1 >= b2) and (t1 < t2 or b1 > b2)
     
-    # best_states now maps each (node, mode) to a Pareto set (list) of states.
     best_states = defaultdict(list)
     priority_queue = []
     
-    source = State(start[0], start[1], cum_energy=0.0, cum_time=0.0)
+    source = State(start[0], start[1], cum_energy=0.0, cum_time=0.0, remaining_battery=constants['BATTERY_CAPACITY'])
     source.compute_cost(energy_vs_time)
     best_states[(source.node, source.mode)].append(source)
     heapq.heappush(priority_queue, source)
@@ -357,12 +353,10 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_
         if dbg:
             print(f"Popped {current_state}")
             
-        # Check that the popped state is still part of the Pareto set.
         if current_state not in best_states[(current_state.node, current_state.mode)]:
             continue
         
         if (current_state.node, current_state.mode) == (goal[0], goal[1]):
-            # Reconstruct the state chain.
             state_chain = []
             state = current_state
             while state is not None:
@@ -374,16 +368,14 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_
         for neighbor in L.successors((current_state.node, current_state.mode)):
             edge = L[(current_state.node, current_state.mode)][neighbor]
             neighbor_node, neighbor_mode = neighbor
-            # Updated: Unpack the extra value recharge_time.
-            new_cum_energy, new_cum_time, did_recharge, recharge_time = compute_edge_transition(current_state, edge, constants)
+            new_cum_energy, new_cum_time, did_recharge, recharge_time, new_remaining = compute_edge_transition(current_state, edge, constants)
             
-            new_state = State(neighbor_node, neighbor_mode, new_cum_energy, new_cum_time)
+            new_state = State(neighbor_node, neighbor_mode, new_cum_energy, new_cum_time, remaining_battery=new_remaining)
             new_state.predecessor = current_state
             new_state.did_recharge = did_recharge
-            new_state.recharge_time = recharge_time  # Record the recharge duration.
+            new_state.recharge_time = recharge_time
             new_state.compute_cost(energy_vs_time)
             
-            # Check if new_state is dominated by any state already in best_states for this key.
             dominated_flag = False
             for s in best_states[(neighbor_node, neighbor_mode)]:
                 if dominates(s, new_state):
@@ -394,7 +386,6 @@ def layered_dijkstra_with_battery(G_world, L, start, goal, constants, energy_vs_
             if dominated_flag:
                 continue
             
-            # Remove any states that are dominated by the new_state.
             non_dominated = []
             for s in best_states[(neighbor_node, neighbor_mode)]:
                 if not dominates(new_state, s):

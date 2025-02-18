@@ -185,6 +185,7 @@ class PremadeScenarios:
         fly_offset = 52.7
         d_drive = 1800
         cliff_offset = -2414
+        d_recharge = 2227 # one less, it doesnt need to recharge
 
         nodes = {
             0: (0,    0, 0),
@@ -203,6 +204,32 @@ class PremadeScenarios:
             (0, 3, "slope"),
             (3, 7, "slope"),
         ]
+
+
+        # nodes = {
+        #     0: (0,    0, 0),
+        #     1: (fly_offset, 0, 0),
+        #     4: (fly_offset + (d_water-fly_offset)/2, 0, 0),
+        #     2: (d_water / 2, math.sqrt(d_drive**2 - (d_water/2)**2), 0),
+        #     6: (d_water, 0, 0),
+        #     7: (d_water+d_recharge, 0, 0),
+        #     3: (0, cliff_offset, 100),
+        #     5: (d_water+d_recharge/2, 0, 0),
+
+
+        # }
+        # edges = [
+        #     (0, 1, "water"),
+        #     (1, 4, "water"),
+        #     (4, 6, "water"),
+        #     (0, 2, "grass"),
+        #     (2, 6, "grass"),
+        #     (0, 3, "slope"),
+        #     (3, 6, "slope"),
+        #     (6, 5, "grass"),
+        #     (5, 7, "grass"),
+        # ]
+
 
 
         G = nx.Graph()

@@ -209,25 +209,30 @@ for scenario in all_scenarios:
 ###############################################################################
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
-selected_variation = 0
-selected_scenario = "scenario_3"
-if selected_scenario in all_results[selected_variation]["results"]:
-    constants = all_results[selected_variation]["constants"]
-    data = all_results[selected_variation]["results"][selected_scenario]
-    G_world = data["G_world"]
-    L = data["L"]
-    optimal_path = data["optimal_path"]
-    meta_paths = data["meta_paths"]
-    pareto_front = data["pareto_front"]
+for selected_scenario in all_scenarios:
+    selected_variation = 0
+    if selected_scenario in all_results[selected_variation]["results"]:
+        constants = all_results[selected_variation]["constants"]
+        data = all_results[selected_variation]["results"][selected_scenario]
+        G_world = data["G_world"]
+        L = data["L"]
+        optimal_path = data["optimal_path"]
+        meta_paths = data["meta_paths"]
+        pareto_front = data["pareto_front"]
 
-    # # For example, visualize metrics for baseline:
-    visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="all_edges")
-    print("Optimal Path:")
-    print(optimal_path)
-    print("-----")
+        # # For example, visualize metrics for baseline:
 
-    plot_basic_metrics(meta_paths, pareto_front, optimal_path)
-else:
-    print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
+        print("Optimal Path:")
+        print(optimal_path)
+        print("-----")
+
+        visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="all_edges")
+        plot_basic_metrics(meta_paths, pareto_front, optimal_path)
+
+
+    else:
+        print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
+
+
 
 # %%
