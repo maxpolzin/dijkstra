@@ -250,6 +250,58 @@ class PremadeScenarios:
 
 
     @staticmethod
+    def scenario_5():
+        
+        fly_dist = 956.9
+        roll_dist = 4557.1
+        fly_dist_proj = math.sqrt(fly_dist**2 - 100**2)
+        roll_dist = math.sqrt(roll_dist**2 - 100**2) 
+        
+
+        nodes = {
+            0: (0,    0, 0),
+            1: (1800, math.sqrt(2518**2-1800**2) , 0),
+            3: (3600, 0, 0),
+            2: (-fly_dist_proj, 0, 100),
+
+            4: (3600+1800, math.sqrt(2518**2-1800**2) , 0),
+            7: (3600+3600, 0, 0),
+            5: (3600-fly_dist_proj, 0, 100),            
+        }
+        edges = [
+            (0, 1, "water"),
+            (1, 3, "water"),
+            (0, 2, "cliff"),
+            (2, 3, "slope"),
+            (0, 3, "grass"),
+
+            (3, 4, "water"),
+            (4, 7, "water"),
+            (3, 5, "cliff"),
+            (5, 7, "slope"),
+            (3, 7, "grass"),
+
+        ]
+
+        G = nx.Graph()
+        for node, coordinates in nodes.items():
+            x, y, z = coordinates
+            G.add_node(node, x=x, y=y, height=z)
+        for (u, v, terrain) in edges:
+            G.add_edge(u, v, terrain=terrain)
+        for (u, v) in G.edges():
+            x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+            x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+            dx = x_u - x_v
+            dy = y_u - y_v
+            dz = z_u - z_v
+            G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
+        print("Built scenario 4.")
+        return G
+
+
+
+    @staticmethod
     def straight_grass():
         G = nx.Graph()
         nodes = {
@@ -381,6 +433,7 @@ class PremadeScenarios:
             "scenario_2": cls.scenario_2(),
             "scenario_4": cls.scenario_4(),
             "scenario_3": cls.scenario_3(),
+            "scenario_5": cls.scenario_5(),
         }
 
 
