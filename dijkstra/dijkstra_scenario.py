@@ -296,7 +296,7 @@ class PremadeScenarios:
             dy = y_u - y_v
             dz = z_u - z_v
             G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
-        print("Built scenario 4.")
+        print("Built scenario 5.")
         return G
 
 
