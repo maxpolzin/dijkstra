@@ -58,7 +58,7 @@ class PremadeScenarios:
     @staticmethod
     def scenario_1():
         # Predefined scenario 1
-        distance_factor = 1.5
+        distance_factor = 3 #1.5
         nodes = {
             0: (distance_factor*0,   distance_factor*0, 0),
             1: (distance_factor*200, distance_factor*750, 0),
@@ -103,7 +103,7 @@ class PremadeScenarios:
 
     @staticmethod
     def scenario_2():
-        factor = 1.4
+        factor = 3 #1.4
         nodes = {
             0: (factor*0,   factor*0, 0),
             1: (factor*300, factor*200, 0),
@@ -424,16 +424,16 @@ class PremadeScenarios:
         Returns a dictionary mapping scenario names to the generated graphs.
         """
         return {
-            "straight_grass": cls.straight_grass(),
-            "straight_water": cls.straight_water(),
-            "fly_up_cliff": cls.fly_up_cliff(),
-            "two_slopes": cls.two_slopes(),
+            # "straight_grass": cls.straight_grass(),
+            # "straight_water": cls.straight_water(),
+            # "fly_up_cliff": cls.fly_up_cliff(),
+            # "two_slopes": cls.two_slopes(),
             "scenario_0": cls.scenario_0(),
-            "scenario_1": cls.scenario_1(),
-            "scenario_2": cls.scenario_2(),
-            "scenario_4": cls.scenario_4(),
-            "scenario_3": cls.scenario_3(),
-            "scenario_5": cls.scenario_5(),
+            # "scenario_1": cls.scenario_1(),
+            # "scenario_2": cls.scenario_2(),
+            # "scenario_4": cls.scenario_4(),
+            # "scenario_3": cls.scenario_3(),
+            # "scenario_5": cls.scenario_5(),
         }
 
 

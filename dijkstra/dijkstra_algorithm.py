@@ -131,6 +131,17 @@ class Path:
         # result += f"Total energy consumption: {self.total_energy:.3f} Wh\n"
         return result
 
+    def __eq__(self, other):
+        if not isinstance(other, Path):
+            return False
+        # Compare based on the sequence of (node, mode) tuples.
+        return self.path == other.path
+
+    def __hash__(self):
+        # Hash the tuple of (node, mode) pairs.
+        return hash(tuple(self.path))
+
+
 
 class MetaPath:
     def __init__(self, path_obj, constants):
@@ -421,16 +432,13 @@ def process_subgraph(subgraph, start, goal, L, energy_vs_time, constants, dbg):
 
 def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, dbg=False):
     speedup = True
-    feasible_paths = []  # Will hold Path objects
+    feasible_paths = []
 
     subgraphs = []
     if speedup:
-        # Enumerate simple paths in the world graph (ignoring modes).
         simple_paths_in_world = list(nx.all_simple_paths(G_world, source=start[0], target=goal[0]))
         if dbg:
             print(f"Found {len(simple_paths_in_world)} simple paths in the world graph.")
-
-        # For each simple world path, extract the corresponding subgraph of L.
         for path in simple_paths_in_world:
             if dbg:
                 print(f"Simple path in world: {path}")
@@ -438,7 +446,6 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, 
             selected_nodes = [node for node in L.nodes if node[0] in path_node_set]
             subgraph = L.subgraph(selected_nodes).copy()
             subgraphs.append(subgraph)
-
         if dbg:
             print(f"Created {len(subgraphs)} subgraphs from the layered graph.")
     else:
@@ -448,7 +455,6 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, 
     for subgraph in subgraphs:
         results.append(process_subgraph(subgraph, start, goal, L, energy_vs_time, constants, dbg))
 
-    # Flatten the list of lists.
     for sublist in results:
         feasible_paths.extend(sublist)
     
@@ -456,7 +462,11 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, 
         analysed_paths = sum(len(list(nx.all_simple_paths(subgraph, source=start, target=goal))) for subgraph in subgraphs)
         print(f"Analysed {analysed_paths} paths and found {len(feasible_paths)} feasible paths.")
 
-    return feasible_paths
+    unique_paths = list(set(feasible_paths))
+    duplicates_removed = len(feasible_paths) - len(unique_paths)
+    if dbg:
+        print(f"Removed {duplicates_removed} duplicate paths. Remaining: {len(unique_paths)} paths.")
+    return unique_paths
 
 
 def compute_pareto_front(meta_paths, tol=0.0):

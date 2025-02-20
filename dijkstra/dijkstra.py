@@ -189,7 +189,7 @@ import pickle
 from dijkstra_scenario import PremadeScenarios
 
 all_scenarios = PremadeScenarios.get_all()
-all_variations = list(SensitivityConstants(CONSTANTS, variation=0.3))
+all_variations = list(SensitivityConstants(CONSTANTS, variation=0.3))[:1]
 
 
 def process_variation(idx, var_constants):
@@ -204,8 +204,11 @@ def process_variation(idx, var_constants):
 
 
 
-recompute = False
+recompute = True
 pickle_file = "all_results.pkl"
+
+if recompute:
+    memory.clear()
 
 if os.path.exists(pickle_file) and not recompute:
     print("Loading all_results from pickle file...")
@@ -213,8 +216,8 @@ if os.path.exists(pickle_file) and not recompute:
         all_results = pickle.load(f)
 else:
     print("Computing all_results...")
-   
-    all_results_list = Parallel(n_jobs=3)(
+
+    all_results_list = Parallel(n_jobs=-1)(
         delayed(process_variation)(idx, var_constants)
         for idx, var_constants in enumerate(all_variations)
     )
@@ -365,10 +368,88 @@ def plot_pareto_front_distance_vs_time(pareto_front, L, constants, ax=None):
 
 
 
+def plot_path_distance_vs_time(meta_paths, L, constants, n_paths, ax=None ):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 6))
+    mode_colors_local = {
+        'fly':        'red',
+        'drive':      'lightgreen',
+        'roll':       'yellow',
+        'swim':       'blue',
+        'switching':  'gray',
+        'recharging': 'black',
+    }
+    # Sort the meta_paths by total travel time and select the lowest n_paths
+    selected_paths = sorted(meta_paths, key=lambda m: m.total_time)[:n_paths]
+
+    def plot_single_path_distance_time(path_obj, index=0):
+        state_chain = path_obj.state_chain
+        if len(state_chain) < 2:
+            return
+        t_prev, d_prev = 0.0, 0.0
+        final_time = state_chain[-1].cum_time
+        final_distance = 0.0
+        for i in range(1, len(state_chain)):
+            old_state = state_chain[i - 1]
+            new_state = state_chain[i]
+            dt = new_state.cum_time - old_state.cum_time
+            dist_travel = 0.0
+            if L.has_edge((old_state.node, old_state.mode), (new_state.node, new_state.mode)):
+                dist_travel = L[(old_state.node, old_state.mode)][(new_state.node, new_state.mode)].get('distance', 0.0)
+            recharge_t = new_state.recharge_time
+            travel_t = dt - recharge_t
+            if recharge_t > 0:
+                t_new = t_prev + recharge_t
+                ax.plot([t_prev, t_new], [d_prev, d_prev],
+                        color=mode_colors_local['recharging'], linewidth=2)
+                t_prev = t_new
+            if old_state.node == new_state.node and old_state.mode != new_state.mode:
+                t_new = t_prev + travel_t
+                ax.plot([t_prev, t_new], [d_prev, d_prev],
+                        color=mode_colors_local['switching'], linewidth=2)
+                t_prev = t_new
+            else:
+                t_new = t_prev + travel_t
+                d_new = d_prev + dist_travel
+                color = mode_colors_local.get(old_state.mode, 'black')
+                ax.plot([t_prev, t_new], [d_prev, d_new],
+                        color=color, linewidth=2)
+                t_prev, d_prev = t_new, d_new
+            final_distance = d_prev
+        ax.text(final_time, final_distance, f"PF{index}",
+                fontsize=8, ha='left', va='bottom')
+    
+    for idx, path_obj in enumerate(selected_paths):
+        plot_single_path_distance_time(path_obj, index=idx)
+    
+    ax.set_xlabel("Time (s)", fontsize=11)
+    ax.set_ylabel("Distance (m)", fontsize=11)
+    ax.set_title("Paths with Lowest Travel Time: Distance vs. Time", fontsize=12)
+    ax.grid(True, linestyle='--', alpha=0.5)
+    
+    from matplotlib.lines import Line2D
+    legend_labels = {
+        'drive': "Drive",
+        'fly': "Fly",
+        'swim': "Swim",
+        'roll': "Roll",
+        'switching': "Mode Switch",
+        'recharging': "Recharging"
+    }
+    legend_handles = [
+        Line2D([0], [0], color=mode_colors_local[m], lw=3, label=legend_labels[m])
+        for m in ['drive','fly','swim','roll','switching','recharging']
+    ]
+    ax.legend(handles=legend_handles, loc='best', fontsize=9)
+    
+    return ax
+
+# %%
+
 ###############################################################################
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
-selected_keys = list(all_scenarios.keys())[4:5]
+selected_keys = list(all_scenarios.keys())[0:1]
 
 for selected_scenario in selected_keys:
     selected_variation = 0
@@ -380,10 +461,17 @@ for selected_scenario in selected_keys:
         optimal_path = data["optimal_path"]
         meta_paths = data["meta_paths"]
         pareto_front = data["pareto_front"]
-
+        
         print("Optimal Path:")
         print(optimal_path)
         print("-----")
+
+        # print first 10 paths
+        selected_paths = sorted(meta_paths, key=lambda m: m.total_time)[:10]
+
+        for meta_path in selected_paths:
+            print(meta_path.path_obj)
+            print("-----")
 
         visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="all_edges")
         plot_basic_metrics(meta_paths, pareto_front, optimal_path)
@@ -391,6 +479,7 @@ for selected_scenario in selected_keys:
         visualize_param_variations(all_results, selected_scenario)
         plot_pareto_front_distance_vs_time(pareto_front, L, constants)
         visualize_pareto_fronts(all_results, selected_scenario)
+        plot_path_distance_vs_time(meta_paths, L, constants, n_paths=100)
         plt.show()
 
     else:
