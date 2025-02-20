@@ -192,7 +192,7 @@ def compute_for_scenario(name, graph, constants):
 
 from dijkstra_scenario import PremadeScenarios
 
-clear_cache = False
+clear_cache = True
 if clear_cache:
     memory.clear()
 
