@@ -642,6 +642,84 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=5):
 
 
 
+def plot_single_path_distance_time(ax, path_obj, L, index):
+    state_chain = path_obj.state_chain
+    if len(state_chain) < 2:
+        return
+    t_prev, d_prev = 0.0, 0.0
+    final_time = state_chain[-1].cum_time
+    for i in range(1, len(state_chain)):
+        old_state = state_chain[i - 1]
+        new_state = state_chain[i]
+        dt = new_state.cum_time - old_state.cum_time
+        dist_travel = 0.0
+        if L.has_edge((old_state.node, old_state.mode), (new_state.node, new_state.mode)):
+            dist_travel = L[(old_state.node, old_state.mode)][(new_state.node, new_state.mode)].get('distance', 0.0)
+        recharge_t = new_state.recharge_time
+        travel_t = dt - recharge_t
+        if recharge_t > 0:
+            t_new = t_prev + recharge_t
+            ax.plot([t_prev, t_new], [d_prev, d_prev],
+                    color=mode_colors['recharging'], linewidth=2)
+            t_prev = t_new
+        if old_state.node == new_state.node and old_state.mode != new_state.mode:
+            t_new = t_prev + travel_t
+            ax.plot([t_prev, t_new], [d_prev, d_prev],
+                    color=mode_colors['switching'], linewidth=2)
+            t_prev = t_new
+        else:
+            t_new = t_prev + travel_t
+            d_new = d_prev + dist_travel
+            color = mode_colors.get(old_state.mode, 'black')
+            ax.plot([t_prev, t_new], [d_prev, d_new],
+                    color=color, linewidth=2)
+            t_prev, d_prev = t_new, d_new
+    ax.text(final_time, d_prev, f"PF{index}", fontsize=8, ha='left', va='bottom')
+
+def plot_paths_distance_vs_time(paths, L, ax):
+    for idx, path_obj in enumerate(paths):
+        plot_single_path_distance_time(ax, path_obj, L, index=idx)
+    ax.set_xlabel("Time (s)", fontsize=11)
+    ax.set_ylabel("Distance (m)", fontsize=11)
+    ax.grid(True, linestyle='--', alpha=0.5)
+    from matplotlib.lines import Line2D
+    legend_labels = {
+        'drive': "Drive",
+        'fly': "Fly",
+        'swim': "Swim",
+        'roll': "Roll",
+        'switching': "Mode Switch",
+        'recharging': "Recharging"
+    }
+    legend_handles = [
+        Line2D([0], [0], color=mode_colors[m], lw=3, label=legend_labels[m])
+        for m in ['drive','fly','swim','roll','switching','recharging']
+    ]
+    ax.legend(handles=legend_handles, loc='best', fontsize=9)
+    return ax
+
+def plot_pareto_front_distance_vs_time(pareto_front, L, constants, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 6))
+    plot_paths_distance_vs_time(pareto_front, L, ax)
+    ax.set_title("Pareto-Front Paths: Distance vs. Time", fontsize=12)
+    return ax
+
+def plot_path_distance_vs_time(meta_paths, L, constants, n_paths, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 6))
+
+    selected_paths = sorted(meta_paths, key=lambda m: m.total_time)[:n_paths]
+    plot_paths_distance_vs_time(selected_paths, L, ax)
+    ax.set_title("Paths with Lowest Travel Time: Distance vs. Time", fontsize=12)
+    return ax
+
+
+
+
+
+
+
 # =============================================================================
 # Stacked Bar Charts: Breakdown per Mode.
 # =============================================================================
