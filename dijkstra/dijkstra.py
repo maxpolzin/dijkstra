@@ -45,9 +45,11 @@
 
 
 
-# plot pareto fronts for parameter variations
+# plot pareto fronts for parameter variations -> Done
+# get rid of crosses -> Done
+
+# Paretor front is only optimal for a certain metric
 # plot pareto front with loss of modality
-# get rid of crosses
 
 
 # resource and risk variance in a scenario
@@ -55,6 +57,19 @@
 # optimal for given risk/resource conditions
 
 
+# How does the behavavioral richness change with the number of modes?
+
+
+
+# Paretofront: Multi-objective optimization
+#  What are our objectives?
+
+# Minimize travel time / Get from A to B
+# Maximize travel distance? Proxy for maximize explored area?
+
+# For all: 
+# Maximize survival likelihood / Minimize risk of failure
+# -> minimize energy consumption / resource uncertainty
 
 
 
@@ -84,7 +99,7 @@ from joblib import Memory, Parallel, delayed
 
 # Imports from your modules
 from dijkstra_algorithm import layered_dijkstra_with_battery, find_all_feasible_paths, analyze_paths, compute_pareto_front, build_layered_graph
-from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars, visualize_param_variations
+from dijkstra_visualize import visualize_world_with_multiline_3D, plot_basic_metrics, plot_stacked_bars, visualize_param_variations, visualize_pareto_fronts
 
 
 
@@ -174,7 +189,7 @@ import pickle
 from dijkstra_scenario import PremadeScenarios
 
 all_scenarios = PremadeScenarios.get_all()
-all_variations = list(SensitivityConstants(CONSTANTS, variation=0.3)) # 0.2, 0.5
+all_variations = list(SensitivityConstants(CONSTANTS, variation=0.3))
 
 
 def process_variation(idx, var_constants):
@@ -199,7 +214,7 @@ if os.path.exists(pickle_file) and not recompute:
 else:
     print("Computing all_results...")
    
-    all_results_list = Parallel(n_jobs=13)(
+    all_results_list = Parallel(n_jobs=3)(
         delayed(process_variation)(idx, var_constants)
         for idx, var_constants in enumerate(all_variations)
     )
@@ -353,7 +368,7 @@ def plot_pareto_front_distance_vs_time(pareto_front, L, constants, ax=None):
 ###############################################################################
 # Visualization of a single scenario for single parameter variation
 ###############################################################################
-selected_keys = list(all_scenarios.keys())[:1]
+selected_keys = list(all_scenarios.keys())[4:5]
 
 for selected_scenario in selected_keys:
     selected_variation = 0
@@ -372,10 +387,10 @@ for selected_scenario in selected_keys:
 
         visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="all_edges")
         plot_basic_metrics(meta_paths, pareto_front, optimal_path)
-        plot_pareto_front_distance_vs_time(pareto_front, L, constants)
-
+        plot_stacked_bars(meta_paths)
         visualize_param_variations(all_results, selected_scenario)
-
+        plot_pareto_front_distance_vs_time(pareto_front, L, constants)
+        visualize_pareto_fronts(all_results, selected_scenario)
         plt.show()
 
     else:
@@ -384,170 +399,24 @@ for selected_scenario in selected_keys:
 
 
 
+# ('roll',) <- makes no sense
+# ('swim',) <- makes no sense
+# ('drive',)
+# ('fly',) 
+# ('roll', 'swim') <- makes no sense
+# ('roll', 'drive')
+# ('roll', 'fly')
+# ('swim', 'drive')
+# ('swim', 'fly')
+# ('drive', 'fly')
+# ('roll', 'swim', 'drive')
+# ('roll', 'swim', 'fly')
+# ('roll', 'drive', 'fly')
+# ('swim', 'drive', 'fly')
+# ('roll', 'swim', 'drive', 'fly')
 
 
 
 
 
 # %%
-
-
-def describe_variation(baseline, variant):
-    differences = []
-    # Compare top-level numeric parameters (excluding MODES)
-    for key in baseline:
-        if key == "MODES":
-            continue
-        if isinstance(baseline[key], (int, float)):
-            if baseline[key] != variant[key]:
-                diff = (variant[key] - baseline[key]) / baseline[key] * 100
-                differences.append(f"{key} {'+' if diff >= 0 else ''}{int(round(diff))}%")
-    # Compare nested parameters in MODES
-    for mode in baseline["MODES"]:
-        for param in baseline["MODES"][mode]:
-            base_val = baseline["MODES"][mode][param]
-            var_val = variant["MODES"][mode][param]
-            if base_val != var_val:
-                diff = (var_val - base_val) / base_val * 100
-                differences.append(f"{mode.capitalize()} {param} {'+' if diff >= 0 else ''}{int(round(diff))}%")
-    return ", ".join(differences)
-
-
-def extract_and_group_min_paths(all_results):
-    baseline_constants = all_results[0]["constants"]
-
-    def get_variation_description(variation_id, variant_constants):
-        if variation_id == 0:
-            return "baseline"
-        return describe_variation(baseline_constants, variant_constants)
-
-    def get_min_energy(pareto_front):
-        if not pareto_front:
-            return (None, None)
-        mp = min(pareto_front, key=lambda x: x.total_energy)
-        return (mp.total_time, mp.total_energy)
-
-    def get_min_time(pareto_front):
-        if not pareto_front:
-            return (None, None)
-        mp = min(pareto_front, key=lambda x: x.total_time)
-        return (mp.total_time, mp.total_energy)
-
-    grouped = {}
-    for variation_id, variation_data in all_results.items():
-        variant_constants = variation_data.get("constants", {})
-        description = get_variation_description(variation_id, variant_constants)
-        scenarios = variation_data.get("results", {})
-        for scenario_name, scenario_data in scenarios.items():
-            pareto_front = scenario_data.get("pareto_front", [])
-            entry = {
-                "min_energy_path": get_min_energy(pareto_front),
-                "min_time_path": get_min_time(pareto_front)
-            }
-            if scenario_name not in grouped:
-                grouped[scenario_name] = {}
-            if variation_id == 0:
-                grouped[scenario_name]["baseline"] = {"id": 0, **entry}
-            else:
-                tokens = description.split()
-                if len(tokens) >= 2:
-                    param = "_".join(token.lower() for token in tokens[:-1])
-                    percent = tokens[-1]
-                else:
-                    param = tokens[0].lower()
-                    percent = ""
-                if param not in grouped[scenario_name]:
-                    grouped[scenario_name][param] = {"ids": []}
-                grouped[scenario_name][param]["ids"].append(variation_id)
-                grouped[scenario_name][param][percent] = entry
-    return grouped
-
-# %matplotlib widget
-
-import matplotlib.pyplot as plt
-# %matplotlib widget
-
-grouped = extract_and_group_min_paths(all_results)
-
-def plot_manual_subplots(grouped, xlim=None):
-    rows = [
-        ("battery_capacity", "Battery Capacity Variation", ["battery_capacity"]),
-        ("drive", "Drive Power and Speed Variation", ["drive", "drive_power", "drive_speed"]),
-        ("fly", "Fly Power and Speed Variation", ["fly", "fly_power", "fly_speed"]),
-        ("swim", "Swim Power and Speed Variation", ["swim", "swim_power", "swim_speed"]),
-        ("roll", "Roll Power and Speed Variation", ["roll", "roll_power", "roll_speed"]),
-        ("switch", "Switch Energy and Speed Variation", ["switch", "switch_time", "switch_energy"])
-    ]
-    
-    scenarios = list(grouped.keys())
-    nrows = len(rows)
-    ncols = len(scenarios)
-    
-    def compute_cross(data):
-        t1, e1 = data["min_energy_path"]
-        t2, e2 = data["min_time_path"]
-        t_min, t_max = min(t1, t2), max(t1, t2)
-        e_min, e_max = min(e1, e2), max(e1, e2)
-        mean_time = (t_min + t_max) / 2
-        mean_energy = (e_min + e_max) / 2
-        dt_low = mean_time - t_min
-        dt_high = t_max - mean_time
-        de_low = mean_energy - e_min
-        de_high = e_max - mean_energy
-        return mean_time, mean_energy, dt_low, dt_high, de_low, de_high
-
-    fig, axes = plt.subplots(nrows, ncols, figsize=(4*ncols, 3*nrows),
-                             sharex=True, sharey=True, squeeze=False)
-    
-    for i, (row_key, row_title, possible_keys) in enumerate(rows):
-        for j, scenario in enumerate(scenarios):
-            ax = axes[i][j]
-            baseline = grouped[scenario].get("baseline")
-            if not baseline or "min_energy_path" not in baseline or "min_time_path" not in baseline:
-                if i == 0:
-                    ax.set_title(scenario)
-                ax.text(0.5, 0.5, "No baseline", ha="center", va="center", transform=ax.transAxes)
-                continue
-            base_mean_time, base_mean_energy, base_dt_low, base_dt_high, base_de_low, base_de_high = compute_cross(baseline)
-            ax.errorbar(base_mean_time, base_mean_energy,
-                        xerr=[[base_dt_low], [base_dt_high]],
-                        yerr=[[base_de_low], [base_de_high]],
-                        fmt="x", color="black", capsize=5, label="baseline")
-            for key in possible_keys:
-                if key in grouped[scenario]:
-                    var_group = grouped[scenario][key]
-                    for perc, var_data in var_group.items():
-                        if perc == "ids":
-                            continue
-                        if not ("min_energy_path" in var_data and "min_time_path" in var_data):
-                            continue
-                        mean_time, mean_energy, dt_low, dt_high, de_low, de_high = compute_cross(var_data)
-                        if "power" in key or "energy" in key:
-                            color = "red"
-                        elif "speed" in key or "time" in key:
-                            color = "blue"
-                        else:
-                            color = "green"
-                        ax.errorbar(mean_time, mean_energy,
-                                    xerr=[[dt_low], [dt_high]],
-                                    yerr=[[de_low], [de_high]],
-                                    fmt="x", color=color, capsize=5, label=f"{key} {perc}")
-            if i == 0:
-                ax.set_title(scenario)
-            if j == 0:
-                ax.set_ylabel(row_title)
-            if i == nrows - 1:
-                ax.set_xlabel("Time")
-            if xlim is not None:
-                ax.set_xlim(xlim)
-            ax.legend(fontsize="x-small")
-    plt.tight_layout()
-    plt.show()
-
-plot_manual_subplots(grouped, xlim=(0, 3000))
-
-
-
-# %%
-
-

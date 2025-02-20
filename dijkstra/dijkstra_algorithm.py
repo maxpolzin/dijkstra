@@ -459,15 +459,16 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, energy_vs_time, 
     return feasible_paths
 
 
-def compute_pareto_front(meta_paths):
+def compute_pareto_front(meta_paths, tol=0.0):
     pareto = []
     for m in meta_paths:
         dominated = False
         for n in meta_paths:
             if n == m:
                 continue
-            if (n.total_time <= m.total_time and n.total_energy <= m.total_energy and
-                (n.total_time < m.total_time or n.total_energy < m.total_energy)):
+            if (n.total_time <= (1 - tol) * m.total_time and 
+                n.total_energy <= (1 - tol) * m.total_energy and
+                (n.total_time < (1 - tol) * m.total_time or n.total_energy < (1 - tol) * m.total_energy)):
                 dominated = True
                 break
         if not dominated:

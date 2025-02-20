@@ -149,18 +149,6 @@ def visualize_world_with_multiline_3D(
     G_world, L=None, path_result=None, constants=None,
     title="World Graph with Costs (3D)", label_option="traveled_only"
 ):
-    """
-    Visualize the world graph in 3D with node and edge labels.
-    
-    Parameters:
-      - G_world: The world graph (nodes have x, y, height).
-      - L: The layered graph.
-      - path_result: A PathResult object.
-      - constants: Dictionary of constants.
-      - title: Plot title.
-      - label_option: "all_edges" to label all traversable edges, "traveled_only" to label only the edges
-                      and direction the robot has actually traveled.
-    """
     if path_result is not None:
         path_states = path_result.path
         switch_nodes = path_result.switch_nodes
@@ -253,7 +241,7 @@ def visualize_world_with_multiline_3D(
     ax.text2D(0.0, 0.0, legend_text, transform=ax.transAxes, verticalalignment='top', horizontalalignment='left',
               fontsize=8, color='black', bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
     
-    plt.show()
+    plt.show(block=False)
 
 
 def visualize_world_and_graph(dem, terrain, G):
@@ -331,6 +319,93 @@ def visualize_world_and_graph(dem, terrain, G):
     ax.view_init(elev=15, azim=-110)  # optional viewpoint angle
 
     plt.show()
+
+
+
+
+def visualize_pareto_fronts(all_results, selected_scenario):
+    rows = [
+        ("battery_capacity", "Battery Capacity Variation", ["battery_capacity"]),
+        ("drive", "Drive Power and Speed Variation", ["drive", "drive_power", "drive_speed"]),
+        ("fly", "Fly Power and Speed Variation", ["fly", "fly_power", "fly_speed"]),
+        ("swim", "Swim Power and Speed Variation", ["swim", "swim_power", "swim_speed"]),
+        ("roll", "Roll Power and Speed Variation", ["roll", "roll_power", "roll_speed"]),
+        ("switch", "Switch Energy and Time Variation", ["switch", "switch_time", "switch_energy"])
+    ]
+    category_color_map = {
+        "battery_capacity": "lightgrey",
+        "drive": mode_colors["drive"],
+        "fly": mode_colors["fly"],
+        "swim": mode_colors["swim"],
+        "roll": mode_colors["roll"],
+        "switch": mode_colors["switching"]
+    }
+    if selected_scenario not in all_results[0]["results"]:
+        print(f"Baseline for scenario {selected_scenario} not found.")
+        return
+    baseline_data = all_results[0]["results"][selected_scenario]
+    baseline_pareto = baseline_data.get("pareto_front", [])
+    baseline_points = [(mp.total_time, mp.total_energy) for mp in baseline_pareto if mp]
+    groups = {row_key: [] for row_key, _, _ in rows}
+    for var_id, var_data in all_results.items():
+        if var_id == 0:
+            continue
+        results = var_data.get("results", {})
+        if selected_scenario not in results:
+            continue
+        variant_pareto = results[selected_scenario].get("pareto_front", [])
+        points = [(mp.total_time, mp.total_energy) for mp in variant_pareto if mp]
+        if not points:
+            continue
+        variant_constants = var_data.get("constants", {})
+        diff = None
+        for row_key, _, rel_keys in rows:
+            if row_key == "battery_capacity":
+                b_val = all_results[0]["constants"].get("BATTERY_CAPACITY")
+                v_val = variant_constants.get("BATTERY_CAPACITY")
+                try:
+                    diff = (v_val - b_val) / b_val
+                except Exception:
+                    diff = 0.0
+            elif row_key in ["drive", "fly", "swim", "roll"]:
+                mode = row_key
+                b_power = all_results[0]["constants"]["MODES"][mode]["power"]
+                v_power = variant_constants["MODES"][mode]["power"]
+                b_speed = all_results[0]["constants"]["MODES"][mode]["speed"]
+                v_speed = variant_constants["MODES"][mode]["speed"]
+                diff = (v_power - b_power) / b_power if abs((v_power - b_power) / b_power) >= abs((v_speed - b_speed) / b_speed) else (v_speed - b_speed) / b_speed
+            elif row_key == "switch":
+                b_time = all_results[0]["constants"].get("SWITCH_TIME")
+                v_time = variant_constants.get("SWITCH_TIME")
+                b_energy = all_results[0]["constants"].get("SWITCH_ENERGY")
+                v_energy = variant_constants.get("SWITCH_ENERGY")
+                diff = (v_time - b_time) / b_time if abs((v_time - b_time) / b_time) >= abs((v_energy - b_energy) / b_energy) else (v_energy - b_energy) / b_energy
+            if diff is not None and abs(diff) > 1e-6:
+                label = f"{diff:+.0%}"
+                groups[row_key].append((label, points))
+                break
+    n_rows = len(rows)
+    fig, axes = plt.subplots(n_rows, 1, figsize=(6, 4 * n_rows), sharex=True, sharey=True)
+    if n_rows == 1:
+        axes = [axes]
+    for i, (row_key, title_text, _) in enumerate(rows):
+        ax = axes[i]
+        if baseline_points:
+            xs, ys = zip(*sorted(baseline_points, key=lambda p: p[0]))
+            ax.plot(xs, ys, linestyle="--", color="black")
+            ax.scatter(xs, ys, color="black", marker="x", label="baseline")
+        if groups.get(row_key):
+            for label, pts in groups[row_key]:
+                xs, ys = zip(*sorted(pts, key=lambda p: p[0]))
+                col = category_color_map.get(row_key, "gray")
+                ax.plot(xs, ys, linestyle="--", color=col)
+                ax.scatter(xs, ys, color=col, marker="o", label=f"{row_key} {label}")
+        ax.set_title(title_text, fontsize=10)
+        ax.legend(fontsize=8)
+    axes[-1].set_xlabel("Travel Time [s]")
+    axes[0].set_ylabel("Energy [Wh]")
+    plt.tight_layout()
+    plt.show(block=False)
 
 
 
@@ -458,7 +533,7 @@ def plot_basic_metrics(meta_paths, pareto_front, optimal_path):
         axs[1, 1].scatter( optimal_path.total_time, optimal_path.total_energy, marker='X', s=100, facecolors='none', edgecolors='black', zorder=10)
     
     plt.tight_layout()
-    plt.show()
+    plt.show(block=False)
 
 
 
@@ -570,114 +645,68 @@ def visualize_param_variations(all_results, selected_scenario, n_cols=5):
 # =============================================================================
 # Stacked Bar Charts: Breakdown per Mode.
 # =============================================================================
-
 def plot_stacked_bars(meta_paths, sort_xticks_interval=10):
-    """
-    Creates a 2x2 figure with four subplots that display:
-      - Top-left: Energy breakdown per mode (sorted by travel time).
-      - Top-right: Time breakdown per mode (sorted by travel time).
-      - Bottom-left: Energy breakdown per mode (sorted by total energy).
-      - Bottom-right: Time breakdown per mode (sorted by total energy).
-    
-    Parameters:
-      - meta_paths: List of MetaPath objects.
-      - sort_xticks_interval: Interval for x-axis tick labeling.
-    """
-    # Define the order of modes and assign colors.
-    modes = ['fly', 'drive', 'roll', 'swim', 'charging', 'switching']
-    colors = {
-        'fly': 'skyblue',
-        'drive': 'lightgreen',
-        'roll': 'orange',
-        'swim': 'purple',
-        'charging': 'salmon',
-        'switching': 'grey'
-    }
-    
-    # Prepare combined data: each element is a tuple of:
-    # (total_time, total_energy, mode_times, mode_energies)
+    modes = mode_colors.keys()
     combined_data = [(meta.total_time, meta.total_energy, meta.mode_times, meta.mode_energies)
                      for meta in meta_paths]
     num_paths = len(meta_paths)
     path_indices = np.arange(1, num_paths + 1)
-    
-    # Sort data in two ways.
     sorted_by_time = sorted(combined_data, key=lambda x: x[0])
-    sorted_times, sorted_energies, sorted_mode_times_time, sorted_mode_energies_time = zip(*sorted_by_time)
-    
+    _, _, sorted_mode_times_time, sorted_mode_energies_time = zip(*sorted_by_time)
     sorted_by_energy = sorted(combined_data, key=lambda x: x[1])
-    sorted_times_energy, sorted_energies_energy, sorted_mode_times_energy, sorted_mode_energies_energy = zip(*sorted_by_energy)
-    
-    # Create a 2x2 figure.
-    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-    
-    # --------------------------
-    # Top-left: Energy breakdown (sorted by travel time)
-    # --------------------------
+    _, _, sorted_mode_times_energy, sorted_mode_energies_energy = zip(*sorted_by_energy)
+    fig, axes = plt.subplots(2, 2, figsize=(8, 6), sharex=True)
     bottom_energy = np.zeros(num_paths)
     for mode in modes:
         mode_vals = [d.get(mode, 0) for d in sorted_mode_energies_time]
         axes[0, 0].bar(path_indices, mode_vals, bottom=bottom_energy,
-                       label=mode.capitalize(), color=colors.get(mode, 'black'))
+                       label=mode.capitalize(), color=mode_colors.get(mode, 'black'))
         bottom_energy += np.array(mode_vals)
-    axes[0, 0].set_ylabel("Energy Consumed [Wh]", fontsize=11)
-    axes[0, 0].set_title("Energy per Mode (Sorted by Travel Time)", fontsize=14)
+    axes[0, 0].set_ylabel("Energy Consumed [Wh]", fontsize=8)
+    axes[0, 0].set_title("Energy per Mode (Sorted by Travel Time)", fontsize=8)
     axes[0, 0].legend(title="Modes", fontsize=8, title_fontsize=8)
     axes[0, 0].grid(True, axis='y', linestyle='--', alpha=0.7)
-    axes[0, 0].set_xlabel("Path Number (Sorted by Travel Time)", fontsize=11)
+    axes[0, 0].set_xlabel("Path Number (Sorted by Travel Time)", fontsize=8)
     axes[0, 0].set_xticks(path_indices[::sort_xticks_interval])
-    axes[0, 0].set_xticklabels(path_indices[::sort_xticks_interval], rotation=45, ha='right', fontsize=10)
-    
-    # --------------------------
-    # Top-right: Time breakdown (sorted by travel time)
-    # --------------------------
+    axes[0, 0].set_xticklabels(path_indices[::sort_xticks_interval], rotation=45, ha='right', fontsize=8)
     bottom_time = np.zeros(num_paths)
     for mode in modes:
         mode_vals = [d.get(mode, 0) for d in sorted_mode_times_time]
         axes[0, 1].bar(path_indices, mode_vals, bottom=bottom_time,
-                       label=mode.capitalize(), color=colors.get(mode, 'black'))
+                       label=mode.capitalize(), color=mode_colors.get(mode, 'black'))
         bottom_time += np.array(mode_vals)
-    axes[0, 1].set_ylabel("Time Spent [s]", fontsize=11)
-    axes[0, 1].set_title("Time per Mode (Sorted by Travel Time)", fontsize=14)
+    axes[0, 1].set_ylabel("Time Spent [s]", fontsize=8)
+    axes[0, 1].set_title("Time per Mode (Sorted by Travel Time)", fontsize=8)
     axes[0, 1].legend(title="Modes", fontsize=8, title_fontsize=8)
     axes[0, 1].grid(True, axis='y', linestyle='--', alpha=0.7)
-    axes[0, 1].set_xlabel("Path Number (Sorted by Travel Time)", fontsize=11)
+    axes[0, 1].set_xlabel("Path Number (Sorted by Travel Time)", fontsize=8)
     axes[0, 1].set_xticks(path_indices[::sort_xticks_interval])
-    axes[0, 1].set_xticklabels(path_indices[::sort_xticks_interval], rotation=45, ha='right', fontsize=10)
-    
-    # --------------------------
-    # Bottom-left: Energy breakdown (sorted by total energy)
-    # --------------------------
+    axes[0, 1].set_xticklabels(path_indices[::sort_xticks_interval], rotation=45, ha='right', fontsize=8)
     bottom_energy = np.zeros(num_paths)
     for mode in modes:
         mode_vals = [d.get(mode, 0) for d in sorted_mode_energies_energy]
         axes[1, 0].bar(path_indices, mode_vals, bottom=bottom_energy,
-                       label=mode.capitalize(), color=colors.get(mode, 'black'))
+                       label=mode.capitalize(), color=mode_colors.get(mode, 'black'))
         bottom_energy += np.array(mode_vals)
-    axes[1, 0].set_ylabel("Energy Consumed [Wh]", fontsize=11)
-    axes[1, 0].set_title("Energy per Mode (Sorted by Total Energy)", fontsize=14)
+    axes[1, 0].set_ylabel("Energy Consumed [Wh]", fontsize=8)
+    axes[1, 0].set_title("Energy per Mode (Sorted by Total Energy)", fontsize=8)
     axes[1, 0].legend(title="Modes", fontsize=8, title_fontsize=8)
     axes[1, 0].grid(True, axis='y', linestyle='--', alpha=0.7)
-    axes[1, 0].set_xlabel("Path Number (Sorted by Total Energy)", fontsize=11)
+    axes[1, 0].set_xlabel("Path Number (Sorted by Total Energy)", fontsize=8)
     axes[1, 0].set_xticks(path_indices[::sort_xticks_interval])
-    axes[1, 0].set_xticklabels(path_indices[::sort_xticks_interval], rotation=45, ha='right', fontsize=10)
-    
-    # --------------------------
-    # Bottom-right: Time breakdown (sorted by total energy)
-    # --------------------------
+    axes[1, 0].set_xticklabels(path_indices[::sort_xticks_interval], rotation=45, ha='right', fontsize=8)
     bottom_time = np.zeros(num_paths)
     for mode in modes:
         mode_vals = [d.get(mode, 0) for d in sorted_mode_times_energy]
         axes[1, 1].bar(path_indices, mode_vals, bottom=bottom_time,
-                       label=mode.capitalize(), color=colors.get(mode, 'black'))
+                       label=mode.capitalize(), color=mode_colors.get(mode, 'black'))
         bottom_time += np.array(mode_vals)
-    axes[1, 1].set_ylabel("Time Spent [s]", fontsize=11)
-    axes[1, 1].set_title("Time per Mode (Sorted by Total Energy)", fontsize=14)
+    axes[1, 1].set_ylabel("Time Spent [s]", fontsize=8)
+    axes[1, 1].set_title("Time per Mode (Sorted by Total Energy)", fontsize=8)
     axes[1, 1].legend(title="Modes", fontsize=8, title_fontsize=8)
     axes[1, 1].grid(True, axis='y', linestyle='--', alpha=0.7)
-    axes[1, 1].set_xlabel("Path Number (Sorted by Total Energy)", fontsize=11)
+    axes[1, 1].set_xlabel("Path Number (Sorted by Total Energy)", fontsize=8)
     axes[1, 1].set_xticks(path_indices[::sort_xticks_interval])
-    axes[1, 1].set_xticklabels(path_indices[::sort_xticks_interval], rotation=45, ha='right', fontsize=10)
-    
+    axes[1, 1].set_xticklabels(path_indices[::sort_xticks_interval], rotation=45, ha='right', fontsize=8)
     plt.tight_layout()
-    plt.show()
+    plt.show(block=False)
