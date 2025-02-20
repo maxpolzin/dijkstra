@@ -537,6 +537,8 @@ def plot_basic_metrics(meta_paths, pareto_front, optimal_path):
 
 
 
+
+
 def visualize_param_variations(all_results, selected_scenario, n_cols=5):
     variation_keys = sorted([k for k, v in all_results.items() if selected_scenario in v["results"]])
     n_variations = len(variation_keys)
@@ -716,15 +718,22 @@ def plot_path_distance_vs_time(meta_paths, L, constants, n_paths, ax=None):
 
 
 
+def plot_bar_subplot(ax, sorted_dicts, path_indices, sort_interval, ylabel, title):
+    bottom = np.zeros(len(path_indices))
+    for mode in mode_colors.keys():
+        mode_vals = [d.get(mode, 0) for d in sorted_dicts]
+        ax.bar(path_indices, mode_vals, bottom=bottom,
+               label=mode.capitalize(), color=mode_colors.get(mode, 'black'))
+        bottom += np.array(mode_vals)
+    ax.set_ylabel(ylabel, fontsize=8)
+    ax.set_title(title, fontsize=8)
+    ax.legend(title="Modes", fontsize=8, title_fontsize=8)
+    ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+    ax.set_xlabel("Path #", fontsize=8)
+    ax.set_xticks(path_indices[::sort_interval])
+    ax.set_xticklabels(path_indices[::sort_interval], rotation=45, ha='right', fontsize=8)
 
-
-
-
-# =============================================================================
-# Stacked Bar Charts: Breakdown per Mode.
-# =============================================================================
 def plot_stacked_bars(meta_paths, sort_xticks_interval=10):
-    # Store total and breakdown info; ensure mode_distances is kept as a dict.
     combined_data = [
         (
             m.total_time,
@@ -738,53 +747,23 @@ def plot_stacked_bars(meta_paths, sort_xticks_interval=10):
     ]
     num_paths = len(meta_paths)
     path_indices = np.arange(1, num_paths + 1)
-    
-    # Sorted by travel time
     sorted_by_time = sorted(combined_data, key=lambda x: x[0])
-    (_, _, sorted_mode_times_time, sorted_mode_energies_time, _, sorted_mode_distances_time) = zip(*sorted_by_time)
-    
-    # Sorted by total energy
+    (_, _, times_time, energies_time, _, distances_time) = zip(*sorted_by_time)
     sorted_by_energy = sorted(combined_data, key=lambda x: x[1])
-    (_, _, sorted_mode_times_energy, sorted_mode_energies_energy, _, sorted_mode_distances_energy) = zip(*sorted_by_energy)
-    
-    # Sorted by total distance (computed from mode_distances)
+    (_, _, times_energy, energies_energy, _, distances_energy) = zip(*sorted_by_energy)
     sorted_by_distance = sorted(combined_data, key=lambda x: x[4])
-    (_, _, sorted_mode_times_distance, sorted_mode_energies_distance, _, sorted_mode_distances_distance) = zip(*sorted_by_distance)
+    (_, _, times_distance, energies_distance, _, distances_distance) = zip(*sorted_by_distance)
     
-    # Create a 3x3 grid: rows correspond to sort method (time, energy, distance);
-    # columns: Energy, Time, Distance breakdown.
     fig, axes = plt.subplots(3, 3, figsize=(12, 10), sharex=True)
-    
-    def plot_bar_subplot(ax, sorted_dicts, ylabel, title):
-        bottom = np.zeros(num_paths)
-        for mode in mode_colors.keys():
-            # sorted_dicts is a tuple of dictionaries.
-            mode_vals = [d.get(mode, 0) for d in sorted_dicts]
-            ax.bar(path_indices, mode_vals, bottom=bottom,
-                   label=mode.capitalize(), color=mode_colors.get(mode, 'black'))
-            bottom += np.array(mode_vals)
-        ax.set_ylabel(ylabel, fontsize=8)
-        ax.set_title(title, fontsize=8)
-        ax.legend(title="Modes", fontsize=8, title_fontsize=8)
-        ax.grid(True, axis='y', linestyle='--', alpha=0.7)
-        ax.set_xlabel("Path #", fontsize=8)
-        ax.set_xticks(path_indices[::sort_xticks_interval])
-        ax.set_xticklabels(path_indices[::sort_xticks_interval], rotation=45, ha='right', fontsize=8)
-    
-    # Row 0: Sorted by travel time
-    plot_bar_subplot(axes[0, 0], sorted_mode_energies_time, "Energy [Wh]", "Energy (Time-sorted)")
-    plot_bar_subplot(axes[0, 1], sorted_mode_times_time, "Time [s]", "Time (Time-sorted)")
-    plot_bar_subplot(axes[0, 2], sorted_mode_distances_time, "Distance [m]", "Distance (Time-sorted)")
-    
-    # Row 1: Sorted by total energy
-    plot_bar_subplot(axes[1, 0], sorted_mode_energies_energy, "Energy [Wh]", "Energy (Energy-sorted)")
-    plot_bar_subplot(axes[1, 1], sorted_mode_times_energy, "Time [s]", "Time (Energy-sorted)")
-    plot_bar_subplot(axes[1, 2], sorted_mode_distances_energy, "Distance [m]", "Distance (Energy-sorted)")
-    
-    # Row 2: Sorted by total distance
-    plot_bar_subplot(axes[2, 0], sorted_mode_energies_distance, "Energy [Wh]", "Energy (Distance-sorted)")
-    plot_bar_subplot(axes[2, 1], sorted_mode_times_distance, "Time [s]", "Time (Distance-sorted)")
-    plot_bar_subplot(axes[2, 2], sorted_mode_distances_distance, "Distance [m]", "Distance (Distance-sorted)")
+    plot_bar_subplot(axes[0, 0], energies_time, path_indices, sort_xticks_interval, "Energy [Wh]", "Energy (Time-sorted)")
+    plot_bar_subplot(axes[0, 1], times_time, path_indices, sort_xticks_interval, "Time [s]", "Time (Time-sorted)")
+    plot_bar_subplot(axes[0, 2], distances_time, path_indices, sort_xticks_interval, "Distance [m]", "Distance (Time-sorted)")
+    plot_bar_subplot(axes[1, 0], energies_energy, path_indices, sort_xticks_interval, "Energy [Wh]", "Energy (Energy-sorted)")
+    plot_bar_subplot(axes[1, 1], times_energy, path_indices, sort_xticks_interval, "Time [s]", "Time (Energy-sorted)")
+    plot_bar_subplot(axes[1, 2], distances_energy, path_indices, sort_xticks_interval, "Distance [m]", "Distance (Energy-sorted)")
+    plot_bar_subplot(axes[2, 0], energies_distance, path_indices, sort_xticks_interval, "Energy [Wh]", "Energy (Distance-sorted)")
+    plot_bar_subplot(axes[2, 1], times_distance, path_indices, sort_xticks_interval, "Time [s]", "Time (Distance-sorted)")
+    plot_bar_subplot(axes[2, 2], distances_distance, path_indices, sort_xticks_interval, "Distance [m]", "Distance (Distance-sorted)")
     
     plt.tight_layout()
     plt.show(block=False)

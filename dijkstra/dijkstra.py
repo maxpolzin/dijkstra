@@ -15,7 +15,6 @@
 # I can make scenarios that require each mode and or otherwise infeasible
 
 
-
 # sensitivity to robot/parameter changes
     # delta 12 parameters
     # take all above scenarios, 
@@ -23,9 +22,6 @@
     # vary one parameter at a time, 
     # see how energy, time, mode change
     # makes correspondece between good paths in both runs
-
-
-
 
 
 # sensitivity to multimodality
@@ -37,13 +33,10 @@
     # no flying, no rolling, no swimming, no driving, no recharging
 
 
-
 # how to select good costs and how does that change the path
 # time in motion / resting
 # minimal distance vs. minimal time
 # how to quantify risk?
-
-
 
 # plot pareto fronts for parameter variations -> Done
 # get rid of crosses -> Done
@@ -59,8 +52,6 @@
 
 # How does the behavavioral richness change with the number of modes?
 
-
-
 # Paretofront: Multi-objective optimization
 #  What are our objectives?
 
@@ -71,6 +62,10 @@
 # Maximize survival likelihood / Minimize risk of failure
 # -> minimize energy consumption / resource uncertainty
 
+
+
+
+# plot the pareto front for single mode, dual mode, triple mode, quad mode
 
 
 
@@ -192,7 +187,7 @@ def compute_for_scenario(name, graph, constants):
 
 from dijkstra_scenario import PremadeScenarios
 
-clear_cache = True
+clear_cache = False
 if clear_cache:
     memory.clear()
 
@@ -234,8 +229,55 @@ else:
 
 # %%
 
+import itertools
 
-selected_keys = list(all_scenarios.keys())[0:1]
+
+import itertools
+import matplotlib.pyplot as plt
+
+def get_modes_used(p):
+    return set(mode for (_, mode) in p.path_obj.path)
+
+def plot_pareto_fronts_all_combinations(meta_paths, ax=None, mode_list=["roll", "swim", "drive", "fly"]):
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 6))
+    
+    # Generate all nonempty combinations of the modes.
+    combos = []
+    for r in range(1, len(mode_list) + 1):
+        combos.extend(itertools.combinations(mode_list, r))
+    
+    cmap = plt.get_cmap("tab20")
+    total = len(combos)
+    print(combos)
+    
+    for idx, combo in enumerate(combos):
+        combo_set = set(combo)
+        filtered = [p for p in meta_paths if get_modes_used(p) <= combo_set]
+        if not filtered:
+            continue
+        # Compute the Pareto front for this group.
+        pf = compute_pareto_front(filtered)
+        if not pf:
+            continue
+        # Sort the Pareto front by total travel time.
+        pf_sorted = sorted(pf, key=lambda p: p.total_time)
+        times = [p.total_time for p in pf_sorted]
+        energies = [p.total_energy for p in pf_sorted]
+        color = cmap(idx / total)
+        label = ",".join(combo)
+        ax.plot(times, energies, linestyle="--", marker="o", color=color, label=label)
+    
+    ax.set_xlabel("Travel Time (s)")
+    ax.set_ylabel("Energy Consumption (Wh)")
+    ax.set_title("Pareto Fronts for All Mode Combinations")
+    ax.legend(title="Mode Combo", fontsize=8)
+    ax.grid(True, linestyle="--", alpha=0.5)
+    return ax
+
+
+
+selected_keys = list(all_scenarios.keys())[:]
 
 for selected_scenario in selected_keys:
     selected_variation = 0
@@ -259,13 +301,18 @@ for selected_scenario in selected_keys:
             print(meta_path.path_obj)
             print("-----")
 
-        visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="all_edges")
-        plot_basic_metrics(meta_paths, pareto_front, optimal_path)
-        plot_stacked_bars(meta_paths)
-        visualize_param_variations(all_results, selected_scenario)
+        # visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="all_edges")
+        # plot_basic_metrics(meta_paths, pareto_front, optimal_path)
+        # plot_stacked_bars(meta_paths)
+
+        # visualize_param_variations(all_results, selected_scenario)
+
+        # visualize_pareto_fronts(all_results, selected_scenario)
+
         plot_pareto_front_distance_vs_time(pareto_front, L, constants)
-        visualize_pareto_fronts(all_results, selected_scenario)
-        plot_path_distance_vs_time(meta_paths, L, constants, n_paths=100)
+        # plot_path_distance_vs_time(meta_paths, L, constants, n_paths=100)
+        
+        plot_pareto_fronts_all_combinations(meta_paths, mode_list=["fly", "swim", "roll", "drive"])
         plt.show()
 
     else:
@@ -274,11 +321,11 @@ for selected_scenario in selected_keys:
 
 
 
-# ('roll',) <- makes no sense
-# ('swim',) <- makes no sense
+# ('roll',)
+# ('swim',)
 # ('drive',)
 # ('fly',) 
-# ('roll', 'swim') <- makes no sense
+# ('roll', 'swim')
 # ('roll', 'drive')
 # ('roll', 'fly')
 # ('swim', 'drive')
