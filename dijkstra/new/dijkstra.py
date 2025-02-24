@@ -59,58 +59,161 @@ def compute_for_scenario(graph, constants):
     return G_world, L, meta_paths
 
 
-scenario = PremadeScenarios.scenario_1()
+
+def test1():
+    nodes = {
+        0: (0, 0, 0),
+        1: (0, 0, 0),
+        2: (0, 0, 0),
+        3: (0, 0, 0),
+        4: (0, 0, 100),
+        
+        5: (0, 0, 100),
+        6: (0, 0, 100),
+       
+        7: (0, 0, 0),
+
+        8: (0, 0, 0),
+        9: (0, 0, 0),
+
+        10: (0, 0, 0),
+        11: (0, 0, 0),
+        12: (0, 0, 0),
+        13: (0, 0, 0),
+
+
+    }
+    edges = [
+        (0, 1, "grass", 1040),
+        (1, 2, "grass", 1040),
+        (2, 3, "water", 1000),
+        (3, 4, "cliff", 100),
+        (4, 7, "slope", 3600),
+        
+        (2, 5, "grass", 2000),
+        (5, 4, "grass", 3400),
+
+        
+        (3, 6, "grass", 1100),
+        (6, 4, "grass", 2600),
+
+        (0, 8, "water", 4800),
+        (8, 9, "water", 4800),
+        (9, 7, "water", 4800),
+
+        (0, 10, "cliff", 825),
+        (10, 11, "cliff", 825),
+        (11, 13, "cliff", 825),
+        (13, 7, "cliff", 825)
+
+    ]
+    G = nx.Graph()
+    for node, (x, y, height) in nodes.items():
+        G.add_node(node, x=x, y=y, height=height)
+    for u, v, terrain, distance in edges:
+        G.add_edge(u, v, terrain=terrain, distance=distance)
+    print("Built test1.")
+    return G
+
+
+
+# scenario = PremadeScenarios.test1()
+scenario = test1()
 
 G_world, L, meta_paths = compute_for_scenario(scenario, constants=CONSTANTS)
-
-
-
-
 
 from dijkstra_visualize import visualize_world_with_multiline_3D
 
 
 import itertools
+import matplotlib.pyplot as plt
+from itertools import cycle
 
 def group_meta_paths_by_modes(meta_paths, mode_list=["roll", "swim", "drive", "fly"]):
     combos = [frozenset(combo) for r in range(1, len(mode_list) + 1) for combo in itertools.combinations(mode_list, r)]
+    print(combos)
     groups = {combo: [] for combo in combos}
     for p in meta_paths:
-        used = frozenset(mode for (_, mode) in p.path_obj.path)
+        used = frozenset(mode for (_, mode) in p.path_obj.path[1:-1])
         if used in groups:
             groups[used].append(p)
     return {k: v for k, v in groups.items() if v}
 
-grouped = group_meta_paths_by_modes(meta_paths)
-for k, v in grouped.items():
+# grouped = group_meta_paths_by_modes(meta_paths)
+# for k, v in grouped.items():
+#     print(k, len(v))
+
+def group_meta_paths_by_mode_number(meta_paths):
+    groups = {}
+    for p in meta_paths:
+        used = frozenset(mode for (_, mode) in p.path_obj.path[1:-1])
+        count = len(used)
+        if count:
+            groups.setdefault(count, []).append(p)
+    return groups
+
+grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
+for k, v in grouped_by_number.items():
     print(k, len(v))
 
-#  %%
+def compute_pareto_front(meta_paths):
+    pareto = []
+    for m in meta_paths:
+        dominated = False
+        for n in meta_paths:
+            if n == m:
+                continue
+            if (n.total_time <= m.total_time and n.total_energy <= m.total_energy and
+                (n.total_time < m.total_time or n.total_energy < m.total_energy)):
+                dominated = True
+                break
+        if not dominated:
+            pareto.append(m)
+    return pareto
 
 
-# for path in grouped[frozenset({'swim', 'fly', 'drive', 'roll'})]:
-#     print(path.path_obj)
-#     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
-
-
-
-import matplotlib.pyplot as plt
-from itertools import cycle
-
-grouped = group_meta_paths_by_modes(meta_paths)
 markers = cycle(['o', 's', '^', 'D', 'v', 'P', '*', 'X', 'h', '+'])
 colors = cycle(plt.cm.tab10.colors)
 
-fig, axs = plt.subplots(1, 2, figsize=(11, 5))
+
+grouped = group_meta_paths_by_modes(meta_paths)
+grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
+
+for path in grouped_by_number[4]:
+    print(path.path_obj)
+    print("-----")
+
+markers = cycle(['o', 's', '^', 'D', 'v', 'P', '*', 'X', 'h', '+'])
+colors = cycle(plt.cm.tab10.colors)
+
+fig, axs = plt.subplots(2, 1, figsize=(5, 7))
+
+# Scatter plots for each mode combination (grouped by exact modes used)
 for combo, paths in grouped.items():
-    times = [p.total_time for p in paths]
-    distances = [sum(p.mode_distances.values()) for p in paths]
-    energies = [p.total_energy for p in paths]
     marker = next(markers)
     color = next(colors)
     label = ",".join(sorted(combo))
+    times = [p.total_time for p in paths]
+    distances = [sum(p.mode_distances.values()) for p in paths]
+    energies = [p.total_energy for p in paths]
     axs[0].scatter(times, distances, marker=marker, color=color, label=label)
     axs[1].scatter(times, energies, marker=marker, color=color, label=label)
+
+# Overlay dashed lines for Pareto fronts computed per mode count
+for count, paths in grouped_by_number.items():
+    pf = compute_pareto_front(paths)
+    if not pf:
+        continue
+    pf_sorted = sorted(pf, key=lambda p: p.total_time)
+    times_pf = [p.total_time for p in pf_sorted]
+    energies_pf = [p.total_energy for p in pf_sorted]
+    label = f"{count} mode{'s' if count > 1 else ''} Pareto Front"
+    axs[1].plot(times_pf, energies_pf, linestyle="--", marker=None, color="black", label=label)
+
+# for ax in axs:
+#     ax.set_xlim(0, 5000)
+#     ax.grid(True, linestyle="--", alpha=0.5)
+
 axs[0].set_xlabel("Travel Time (s)")
 axs[0].set_ylabel("Travel Distance (m)")
 axs[0].set_title("Travel Time vs. Distance")
@@ -118,17 +221,17 @@ axs[1].set_xlabel("Travel Time (s)")
 axs[1].set_ylabel("Total Energy (Wh)")
 axs[1].set_title("Travel Time vs. Energy")
 axs[0].legend(title="Mode Combination", fontsize=8)
+# axs[1].legend(title="Mode Combo / Pareto Front", fontsize=8)
+for ax in axs:
+    ax.grid(True, linestyle="--", alpha=0.5)
 plt.tight_layout()
 plt.show()
 
 
 
-
-
-
-
-
-
+# for path in grouped[frozenset({'fly', 'drive', 'swim', 'roll'})]:
+#     print(path.path_obj)
+    # visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
 
 
 
@@ -138,32 +241,6 @@ plt.show()
 import itertools
 
 import matplotlib.pyplot as plt
-
-def get_modes_used(p):
-    return set(mode for (_, mode) in p.path_obj.path)
-
-def plot_paths(meta_paths, ax=None, ):
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 6))
-    
-    mode_list=["roll", "swim", "drive", "fly"]
-    combos = []
-    for r in range(1, len(mode_list) + 1):
-        combos.extend(itertools.combinations(mode_list, r))
-    
-    cmap = plt.get_cmap("tab20")
-    total = len(combos)
-    print(combos)
-    
-    for idx, combo in enumerate(combos):
-        combo_set = set(combo)
-        filtered = [p for p in meta_paths if get_modes_used(p) <= combo_set]
-        if not filtered:
-            continue
-        
-        # plot
-
-
 
 
 
