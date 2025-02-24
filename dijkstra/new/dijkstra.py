@@ -132,7 +132,7 @@ def test2():
         7: (0, 3700, 0),
 
         6: (-1259, 800, 0),
-        8: (-1259, 800, 300),
+        8: (-1259, 950, 250),
         
         9: (0, 0, 0),
 
@@ -146,8 +146,9 @@ def test2():
         
         14: (7286, 2400, 0),
 
-        18: (4900, 2400, 0)
+        18: (4900, 2400, 0),
 
+        19: (-4800, 1100, 150)
 
 
     }
@@ -164,6 +165,9 @@ def test2():
 
         (13, 18, "grass", 2400),
         (18, 15, "grass", 2400),
+
+        (6, 19, "grass", 2400),
+        (19, 7, "slope", 2400),
 
 
         (0, 6, "water", 1200),
@@ -278,7 +282,7 @@ grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 
 pf = compute_pareto_front(grouped_by_number[3])
 for path in pf:
-    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
+    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
 
 
 # pf = compute_pareto_front(grouped_by_number[4])
