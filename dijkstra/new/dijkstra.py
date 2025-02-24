@@ -135,10 +135,11 @@ def test2():
         9: (0, 0, 0),
 
         0: (0, 0, 0),
-        10: (-3190, -500, 0),
-        11: (-5900, 1100, 0),
-        12: (-3500, 3200, 0),
         7: (0, 3700, 0),
+
+        10: (-3458, -692, 0),
+        11: (-5800, 1100, 0),
+        12: (-3460, 3200, 0),
 
         13: (3600, 2000, 0),
         15: (3661, 2687, 0),
@@ -149,6 +150,7 @@ def test2():
         18: (4900, 2400, 0),
 
         19: (-4800, 1100, 150)
+        
 
 
     }
@@ -160,8 +162,8 @@ def test2():
         (4, 5, "cliff", 500),
         (5, 16, "cliff", 500),
 
-        # (4, 16, "grass", 2400),
         (8, 16, "grass", 2400),
+        # (11, 19, "cliff", 2400), # adding this looks nice, but doesnt change anything computation 120s
 
         (13, 18, "grass", 2400),
         (18, 15, "grass", 2400),
@@ -171,15 +173,11 @@ def test2():
 
 
         (0, 6, "water", 1200),
-        # (1, 6, "grass", 2150),
 
         (6, 8, "cliff", 180),
         (8, 16, "slope", 2300),
         (16, 7, "grass", 1040),
         
-        # (10, 15, "grass", 1400),
-        # (16, 15, "grass", 1400),
-
         (0, 10, "grass", 3600),
         (10, 11, "grass", 3600),
         (11, 12, "grass", 3600),
@@ -280,10 +278,9 @@ grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 #     print(path.path_obj)
 #     print("-----")
 
-pf = compute_pareto_front(grouped_by_number[1])
-for path in pf:
-    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
-
+# pf = compute_pareto_front(grouped_by_number[2])
+# for path in pf:
+#     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
 
 # pf = compute_pareto_front(grouped_by_number[4])
 # for path in pf:
