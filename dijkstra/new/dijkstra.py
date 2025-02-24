@@ -121,7 +121,6 @@ def test1():
 
 def test2():
     nodes = {
-        0: (0, 0, 0),
         1: (0, 800, 0),
         2: (0, 1150, 357),
         3: (0, 1400, 0),
@@ -129,16 +128,17 @@ def test2():
         
         5: (0, 2300, 350),
         16: (0, 2660, 0),
-        7: (0, 3700, 0),
 
         6: (-1259, 800, 0),
         8: (-1259, 950, 250),
         
         9: (0, 0, 0),
 
-        10: (-2890, 0, 0),
-        11: (-6000, 1800, 0),
-        12: (-3500, 3700, 0),
+        0: (0, 0, 0),
+        10: (-3190, -500, 0),
+        11: (-5900, 1100, 0),
+        12: (-3500, 3200, 0),
+        7: (0, 3700, 0),
 
         13: (3600, 2000, 0),
         15: (3661, 2687, 0),
@@ -280,9 +280,9 @@ grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 #     print(path.path_obj)
 #     print("-----")
 
-pf = compute_pareto_front(grouped_by_number[3])
+pf = compute_pareto_front(grouped_by_number[1])
 for path in pf:
-    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
+    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
 
 
 # pf = compute_pareto_front(grouped_by_number[4])
