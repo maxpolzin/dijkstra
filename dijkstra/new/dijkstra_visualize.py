@@ -227,6 +227,25 @@ def visualize_world_with_multiline_3D(
                     bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
 
 
+    xs = [G_world.nodes[n].get('x', 0.0) for n in G_world.nodes()]
+    ys = [G_world.nodes[n].get('y', 0.0) for n in G_world.nodes()]
+    zs = [G_world.nodes[n].get('height', 0.0) for n in G_world.nodes()]
+
+    xmin, xmax = min(xs), max(xs)
+    ymin, ymax = min(ys), max(ys)
+    zmin, zmax = min(zs), max(zs)
+
+    max_range = max(xmax - xmin, ymax - ymin, zmax - zmin) / 2
+
+    mid_x = (xmax + xmin) / 2
+    mid_y = (ymax + ymin) / 2
+    mid_z = (zmax + zmin) / 2
+
+    ax.set_xlim(mid_x - max_range, mid_x + max_range)
+    ax.set_ylim(mid_y - max_range, mid_y + max_range)
+    ax.set_zlim(mid_z - max_range/4, mid_z + max_range/4)
+
+
     # 2D Legend.
     if constants is not None:
         legend_text = (

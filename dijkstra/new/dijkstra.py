@@ -149,8 +149,9 @@ def test2():
 
         18: (4900, 2400, 0),
 
-        19: (-4800, 1100, 150)
+        19: (-4800, 1100, 150),
         
+        20: (-1500, -1000, 0)
 
 
     }
@@ -170,6 +171,10 @@ def test2():
 
         (6, 19, "grass", 2400),
         (19, 7, "slope", 2400),
+
+        # (2, 8, "grass", 500),
+        (0, 20, "grass", 500),
+        (20, 6, "grass", 500),
 
 
         (0, 6, "water", 1200),
@@ -278,9 +283,9 @@ grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 #     print(path.path_obj)
 #     print("-----")
 
-# pf = compute_pareto_front(grouped_by_number[2])
-# for path in pf:
-#     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
+pf = compute_pareto_front(grouped_by_number[2])
+for path in pf:
+    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
 
 # pf = compute_pareto_front(grouped_by_number[4])
 # for path in pf:
