@@ -140,11 +140,15 @@ def test2():
         11: (-6000, 1800, 0),
         12: (-3500, 3700, 0),
 
-        13: (3902, 2620, 0),
+        13: (3600, 2000, 0),
         15: (3661, 2687, 0),
-        17: ((3902+3661)/2, (2687+2620)/2, 108),
+        17: ((3600+3661)/2, (2000+2687)/2, 238),
         
-        14: (7286, 3000, 0)
+        14: (7286, 2400, 0),
+
+        18: (4900, 2400, 0)
+
+
 
     }
     edges = [
@@ -155,10 +159,15 @@ def test2():
         (4, 5, "cliff", 500),
         (5, 16, "cliff", 500),
 
-        (4, 16, "grass", 2400),
+        # (4, 16, "grass", 2400),
+        (8, 16, "grass", 2400),
+
+        (13, 18, "grass", 2400),
+        (18, 15, "grass", 2400),
+
 
         (0, 6, "water", 1200),
-        (1, 6, "grass", 2150),
+        # (1, 6, "grass", 2150),
 
         (6, 8, "cliff", 180),
         (8, 16, "slope", 2300),
@@ -208,7 +217,6 @@ G_world, L, meta_paths = compute_for_scenario(scenario, constants=CONSTANTS)
 
 from dijkstra_visualize import visualize_world_with_multiline_3D
 
-visualize_world_with_multiline_3D(G_world, L, None, CONSTANTS, label_option="all_edges")
 
 
 
@@ -268,6 +276,15 @@ grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 #     print(path.path_obj)
 #     print("-----")
 
+pf = compute_pareto_front(grouped_by_number[3])
+for path in pf:
+    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
+
+
+# pf = compute_pareto_front(grouped_by_number[4])
+# for path in pf:
+#     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
+
 
 
 markers = cycle(['o', 's', '^', 'D', 'v', 'P', '*', 'X', 'h', '+'])
@@ -299,6 +316,11 @@ for count, paths in grouped_by_number.items():
     energies_pf = [p.total_energy for p in pf_sorted]
     label = f"{count} mode{'s' if count > 1 else ''} Pareto Front"
     axs[1].plot(times_pf, energies_pf, linestyle="--", marker=None, color="black", label=None)
+
+
+
+
+
 
 # for ax in axs:
 #     ax.set_xlim(0, 5000)
