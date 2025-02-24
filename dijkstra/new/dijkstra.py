@@ -153,6 +153,9 @@ def test2():
         (4, 5, "cliff", 500),
         (5, 16, "cliff", 500),
 
+        (4, 16, "grass", 2400),
+
+
         (0, 6, "water", 1200),
         (1, 6, "grass", 2150),
 
@@ -174,7 +177,11 @@ def test2():
         (14, 15, "water", 4700),
         (15, 7, "water", 3800),
 
+        (13, 15, "cliff", 250),
+
+
     ]
+
     G = nx.Graph()
     for node, (x, y, height) in nodes.items():
         G.add_node(node, x=x, y=y, height=height)
