@@ -36,7 +36,7 @@ CONSTANTS = {
     'SWITCH_TIME': 100.0,    # s
     'SWITCH_ENERGY': 1.0,    # Wh
     'BATTERY_CAPACITY': 30.0,  # Wh
-    'RECHARGE_TIME': 30000.0,   # s or 30000
+    'RECHARGE_TIME': 27000.0,   # s or 30000
     'MODES': {
         'fly':   {'speed': 10.0,  'power': 1000.0},  # m/s, W
         'swim':  {'speed': 0.5,  'power':   10.0},
@@ -283,13 +283,13 @@ grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 #     print(path.path_obj)
 #     print("-----")
 
-pf = compute_pareto_front(grouped_by_number[2])
+# pf = compute_pareto_front(grouped_by_number[2])
+# for path in pf:
+#     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
+
+pf = compute_pareto_front(grouped_by_number[4])
 for path in pf:
     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
-
-# pf = compute_pareto_front(grouped_by_number[4])
-# for path in pf:
-#     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
 
 
 
@@ -298,7 +298,7 @@ colors = cycle(plt.cm.tab10.colors)
 
 # fig, axs = plt.subplots(2, 1, figsize=(5, 7))
 
-fig, ax = plt.subplots(figsize=(5, 4))
+fig, ax = plt.subplots(figsize=(8, 7))
 axs = [None, ax]
 
 # Scatter plots for each mode combination (grouped by exact modes used)
