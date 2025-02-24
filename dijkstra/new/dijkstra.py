@@ -56,6 +56,7 @@ def compute_for_scenario(graph, constants):
     L = build_layered_graph(G_world, constants)
     all_feasible_paths = find_all_feasible_paths(G_world, L, START, GOAL, constants)
     meta_paths = analyze_paths(all_feasible_paths, constants)
+    # return G_world, L, []
     return G_world, L, meta_paths
 
 
@@ -121,28 +122,29 @@ def test1():
 def test2():
     nodes = {
         0: (0, 0, 0),
-        1: (0, 0, 0),
-        2: (0, 0, 0),
-        3: (0, 0, 0),
-        4: (0, 0, 100),
+        1: (0, 800, 0),
+        2: (0, 1150, 357),
+        3: (0, 1400, 0),
+        4: (0, 1940, 0),
         
-        5: (0, 0, 100),
-        6: (0, 0, 100),
-       
-        7: (0, 0, 0),
+        5: (0, 2300, 350),
+        16: (0, 2660, 0),
+        7: (0, 3700, 0),
 
-        8: (0, 0, 100),
+        6: (-1259, 800, 0),
+        8: (-1259, 800, 300),
+        
         9: (0, 0, 0),
 
-        10: (0, 0, 0),
-        11: (0, 0, 100),
-        12: (0, 0, 0),
-        13: (0, 0, 0),
-        14: (0, 0, 0),
-        15: (0, 0, 0),
-        16: (0, 0, 0),
-        17: (0, 0, 0),
+        10: (-2890, 0, 0),
+        11: (-6000, 1800, 0),
+        12: (-3500, 3700, 0),
 
+        13: (3902, 2620, 0),
+        15: (3661, 2687, 0),
+        17: ((3902+3661)/2, (2687+2620)/2, 108),
+        
+        14: (7286, 3000, 0)
 
     }
     edges = [
@@ -155,7 +157,6 @@ def test2():
 
         (4, 16, "grass", 2400),
 
-
         (0, 6, "water", 1200),
         (1, 6, "grass", 2150),
 
@@ -163,30 +164,40 @@ def test2():
         (8, 16, "slope", 2300),
         (16, 7, "grass", 1040),
         
-        (10, 15, "grass", 1400),
+        # (10, 15, "grass", 1400),
+        # (16, 15, "grass", 1400),
 
         (0, 10, "grass", 3600),
         (10, 11, "grass", 3600),
         (11, 12, "grass", 3600),
         (12, 7, "grass", 1800),
 
-        # (12, 8, "grass", 1600),
-
         (0, 13, "water", 4700),
         (13, 14, "water", 4700),
         (14, 15, "water", 4700),
         (15, 7, "water", 3800),
 
-        (13, 15, "cliff", 250),
-
+        (13, 17, "cliff", 125),
+        (17, 15, "cliff", 125),
 
     ]
 
     G = nx.Graph()
     for node, (x, y, height) in nodes.items():
         G.add_node(node, x=x, y=y, height=height)
-    for u, v, terrain, distance in edges:
-        G.add_edge(u, v, terrain=terrain, distance=distance)
+    # for u, v, terrain, distance in edges:
+    #     G.add_edge(u, v, terrain=terrain, distance=distance)
+
+    for (u, v, terrain, _) in edges:
+        G.add_edge(u, v, terrain=terrain)
+    for (u, v) in G.edges():
+        x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
+        x_v, y_v, z_v = G.nodes[v]['x'], G.nodes[v]['y'], G.nodes[v]['height']
+        dx = x_u - x_v
+        dy = y_u - y_v
+        dz = z_u - z_v
+        G[u][v]['distance'] = math.sqrt(dx*dx + dy*dy + dz*dz)
+
     return G
 
 
@@ -197,6 +208,10 @@ G_world, L, meta_paths = compute_for_scenario(scenario, constants=CONSTANTS)
 
 from dijkstra_visualize import visualize_world_with_multiline_3D
 
+visualize_world_with_multiline_3D(G_world, L, None, CONSTANTS, label_option="all_edges")
+
+
+
 
 import itertools
 import matplotlib.pyplot as plt
@@ -204,7 +219,6 @@ from itertools import cycle
 
 def group_meta_paths_by_modes(meta_paths, mode_list=["roll", "swim", "drive", "fly"]):
     combos = [frozenset(combo) for r in range(1, len(mode_list) + 1) for combo in itertools.combinations(mode_list, r)]
-    print(combos)
     groups = {combo: [] for combo in combos}
     for p in meta_paths:
         used = frozenset(mode for (_, mode) in p.path_obj.path[1:-1])
@@ -216,6 +230,7 @@ def group_meta_paths_by_modes(meta_paths, mode_list=["roll", "swim", "drive", "f
 # for k, v in grouped.items():
 #     print(k, len(v))
 
+
 def group_meta_paths_by_mode_number(meta_paths):
     groups = {}
     for p in meta_paths:
@@ -225,9 +240,9 @@ def group_meta_paths_by_mode_number(meta_paths):
             groups.setdefault(count, []).append(p)
     return groups
 
-# grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
-# for k, v in grouped_by_number.items():
-#     print(k, len(v))
+grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
+for k, v in grouped_by_number.items():
+    print(k, len(v))
 
 def compute_pareto_front(meta_paths):
     pareto = []
@@ -307,12 +322,12 @@ plt.show()
 
 # for path in grouped[frozenset({'fly', 'drive'})]:
 #     print(path.path_obj)
-#     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
+#     
+
 
 
 
 # %%
-
 
 import itertools
 

@@ -36,7 +36,7 @@ def get_edge_parameters(mode, terrain, h1, h2, dist, power, speed, constants):
         if mode == 'drive':
             is_feasible = True
         elif mode == 'roll':
-            is_feasible = (h1 == 100 and h2 == 0)
+            is_feasible = (h1 >= 100 and h2 == 0)
     if terrain == 'grass' and mode == 'drive':
         is_feasible = True
 
