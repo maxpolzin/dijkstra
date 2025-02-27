@@ -181,6 +181,7 @@ def test2():
 
         (8, 16, "grass", 2400),
         # (11, 19, "cliff", 2400), # adding this looks nice, but doesnt change anything computation 120s
+        # (12, 19, "slope", 2400), # adding this looks nice, but doesnt change anything computation 120s
 
         (13, 18, "grass", 2400),
         (18, 15, "grass", 2400),
