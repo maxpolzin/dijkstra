@@ -59,7 +59,6 @@ def compute_for_scenario(graph, constants):
     return G_world, L, meta_paths
 
 
-
 def test2():
     nodes = {
         1: (0, 800, 0),
@@ -119,8 +118,8 @@ def test2():
         (5, 16, "cliff"),
 
         (8, 16, "grass"),
-        # (11, 19, "cliff"), # adding this looks nice, but doesnt change anything computation 120s
-        # (12, 19, "slope"), # adding this looks nice, but doesnt change anything computation 120s
+        (11, 19, "cliff"), # adding this looks nice, but doesnt change anything computation 120s
+        (12, 19, "slope"), # adding this looks nice, but doesnt change anything computation 120s
 
         (13, 18, "grass"),
         (18, 15, "grass"),

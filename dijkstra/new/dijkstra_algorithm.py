@@ -3,6 +3,7 @@ import random
 import heapq
 import networkx as nx
 from collections import defaultdict
+from joblib import Parallel, delayed
 
 import time
 import functools
@@ -325,9 +326,13 @@ def find_all_feasible_paths(G_world, L, start, goal, constants, dbg=False):
     else:
         subgraphs = [L]
 
-    results = []
-    for subgraph in subgraphs:
-        results.append(process_subgraph(subgraph, start, goal, L, constants, dbg))
+    if dbg:
+        print(f"Processing {len(subgraphs)} subgraphs.")
+
+    results = Parallel(n_jobs=8)(
+        delayed(process_subgraph)(subgraph, start, goal, L, constants, dbg)
+        for subgraph in subgraphs
+    )
 
     for sublist in results:
         feasible_paths.extend(sublist)
