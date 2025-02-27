@@ -151,11 +151,26 @@ def test2():
 
         19: (-4800, 1100, 150),
         
-        20: (-1700, -1200, 0)
+        20: (-1700, -1200, 0),
+
+        21: (500, 3550, 0), # increases number of paths, but not pareto front
+
+        22: (1200, 700, 0),
+        23: (1000, 1250, 0),
+        24: (1000, 1350, 140),
+        26: (560, 2150, 202),
 
 
     }
     edges = [
+
+        (0, 22, "water", 0),
+        (22, 23, "water", 0),
+        (23, 24, "cliff", 0),
+        (24, 26, "grass", 0),
+        (26, 7, "slope", 0),
+
+
         (0, 1, "grass", 800),
         (1, 2, "cliff", 500),
         (2, 3, "cliff", 500),
@@ -172,9 +187,12 @@ def test2():
         (6, 19, "grass", 2400),
         (19, 7, "slope", 2400),
 
-        # (2, 8, "grass", 500),
         (0, 20, "grass", 500),
         (20, 6, "grass", 500),
+
+        # (16, 21, "grass", 1200),
+        # (21, 7, "water", 1200),
+        # (2, 8, "grass", 500),
 
 
         (0, 6, "water", 1200),
@@ -279,9 +297,9 @@ def compute_pareto_front(meta_paths):
 grouped = group_meta_paths_by_modes(meta_paths)
 grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 
-# for path in grouped_by_number[4]:
-#     print(path.path_obj)
-#     print("-----")
+for path in grouped_by_number[4]:
+    print(path.path_obj)
+    print("-----")
 
 # pf = compute_pareto_front(grouped_by_number[2])
 # for path in pf:
@@ -289,7 +307,7 @@ grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 
 pf = compute_pareto_front(grouped_by_number[4])
 for path in pf:
-    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
+    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
 
 
 
@@ -357,52 +375,52 @@ plt.show()
 
 # %%
 
-import itertools
+# import itertools
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 
-selected_keys = list(all_scenarios.keys())[:]
+# selected_keys = list(all_scenarios.keys())[:]
 
-for selected_scenario in selected_keys:
-    selected_variation = 0
-    if selected_scenario in all_results[selected_variation]["results"]:
-        constants = all_results[selected_variation]["constants"]
-        data = all_results[selected_variation]["results"][selected_scenario]
-        G_world = data["G_world"]
-        L = data["L"]
-        optimal_path = data["optimal_path"]
-        meta_paths = data["meta_paths"]
-        pareto_front = data["pareto_front"]
+# for selected_scenario in selected_keys:
+#     selected_variation = 0
+#     if selected_scenario in all_results[selected_variation]["results"]:
+#         constants = all_results[selected_variation]["constants"]
+#         data = all_results[selected_variation]["results"][selected_scenario]
+#         G_world = data["G_world"]
+#         L = data["L"]
+#         optimal_path = data["optimal_path"]
+#         meta_paths = data["meta_paths"]
+#         pareto_front = data["pareto_front"]
         
-        print("Optimal Path:")
-        print(optimal_path)
-        print("-----")
+#         print("Optimal Path:")
+#         print(optimal_path)
+#         print("-----")
 
-        # print first 10 paths
-        selected_paths = sorted(meta_paths, key=lambda m: m.total_time)[:10]
+#         # print first 10 paths
+#         selected_paths = sorted(meta_paths, key=lambda m: m.total_time)[:10]
 
-        for meta_path in selected_paths:
-            print(meta_path.path_obj)
-            print("-----")
+#         for meta_path in selected_paths:
+#             print(meta_path.path_obj)
+#             print("-----")
 
-        # visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="all_edges")
-        # plot_basic_metrics(meta_paths, pareto_front, optimal_path)
-        # plot_stacked_bars(meta_paths)
+#         # visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="all_edges")
+#         # plot_basic_metrics(meta_paths, pareto_front, optimal_path)
+#         # plot_stacked_bars(meta_paths)
 
-        # visualize_param_variations(all_results, selected_scenario)
+#         # visualize_param_variations(all_results, selected_scenario)
 
-        # visualize_pareto_fronts(all_results, selected_scenario)
+#         # visualize_pareto_fronts(all_results, selected_scenario)
 
-        plot_pareto_front_distance_vs_time(pareto_front, L, constants)
-        # plot_path_distance_vs_time(meta_paths, L, constants, n_paths=100)
+#         plot_pareto_front_distance_vs_time(pareto_front, L, constants)
+#         # plot_path_distance_vs_time(meta_paths, L, constants, n_paths=100)
         
-        plot_pareto_fronts_all_combinations(meta_paths, mode_list=["fly", "swim", "roll", "drive"])
-        plt.show()
+#         plot_pareto_fronts_all_combinations(meta_paths, mode_list=["fly", "swim", "roll", "drive"])
+#         plt.show()
 
-    else:
-        print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
+#     else:
+#         print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
 
 
 
