@@ -243,23 +243,35 @@ grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 #     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
 
 
+# Define markers and colors
 markers = cycle(['o', 's', '^', 'D', 'v', 'P', '*', 'X', 'h', '+'])
 colors = cycle(plt.cm.tab10.colors)
 
-
-
-fig, axs = plt.subplots(2, 1, figsize=(5, 7))
-
-# Scatter plots for each mode combination (grouped by exact modes used)
+# Figure 1: Travel Time vs. Distance
+fig1, ax1 = plt.subplots(figsize=(5, 7))
 for combo, paths in grouped.items():
     marker = next(markers)
     color = next(colors)
     label = ",".join(sorted(combo))
     times = [p.total_time for p in paths]
     distances = [sum(p.mode_distances.values()) for p in paths]
+    ax1.scatter(times, distances, marker=marker, color=color, label=label)
+ax1.set_xlabel("Travel Time (s)")
+ax1.set_ylabel("Travel Distance (m)")
+ax1.set_title("Travel Time vs. Distance")
+ax1.grid(True, linestyle="--", alpha=0.5)
+ax1.legend(title="Mode Combination", fontsize=8)
+plt.tight_layout()
+
+# Figure 2: Travel Time vs. Energy
+fig2, ax2 = plt.subplots(figsize=(5, 7))
+for combo, paths in grouped.items():
+    marker = next(markers)
+    color = next(colors)
+    label = ",".join(sorted(combo))
+    times = [p.total_time for p in paths]
     energies = [p.total_energy for p in paths]
-    axs[0].scatter(times, distances, marker=marker, color=color, label=label)
-    axs[1].scatter(times, energies, marker=marker, color=color, label=label)
+    ax2.scatter(times, energies, marker=marker, color=color, label=label)
 
 for count, paths in grouped_by_number.items():
     pf = compute_pareto_front(paths)
@@ -268,24 +280,15 @@ for count, paths in grouped_by_number.items():
     pf_sorted = sorted(pf, key=lambda p: p.total_time)
     times_pf = [p.total_time for p in pf_sorted]
     energies_pf = [p.total_energy for p in pf_sorted]
-    label = f"{count} mode{'s' if count > 1 else ''} Pareto Front"
-    axs[1].plot(times_pf, energies_pf, linestyle="--", marker=None, color="black", label=None)
+    ax2.plot(times_pf, energies_pf, linestyle="--", marker=None, color="black")
 
-for ax in axs:
-    ax.grid(True, linestyle="--", alpha=0.5)
-
-axs[0].set_xlabel("Travel Time (s)")
-axs[0].set_ylabel("Travel Distance (m)")
-axs[0].set_title("Travel Time vs. Distance")
-axs[1].set_xlabel("Travel Time (s)")
-axs[1].set_ylabel("Total Energy (Wh)")
-axs[1].set_title("Travel Time vs. Energy")
-axs[0].legend(title="Mode Combination", fontsize=8)
-axs[1].legend(title="Mode Combo / Pareto Front", fontsize=8)
-for ax in axs:
-    if ax is not None:
-        ax.grid(True, linestyle="--", alpha=0.5)
+ax2.set_xlabel("Travel Time (s)")
+ax2.set_ylabel("Total Energy (Wh)")
+ax2.set_title("Travel Time vs. Energy")
+ax2.grid(True, linestyle="--", alpha=0.5)
+ax2.legend(title="Mode Combo / Pareto Front", fontsize=8)
 plt.tight_layout()
+
 plt.show()
 
 
