@@ -56,66 +56,7 @@ def compute_for_scenario(graph, constants):
     L = build_layered_graph(G_world, constants)
     all_feasible_paths = find_all_feasible_paths(G_world, L, START, GOAL, constants)
     meta_paths = analyze_paths(all_feasible_paths, constants)
-    # return G_world, L, []
     return G_world, L, meta_paths
-
-
-
-def test1():
-    nodes = {
-        0: (0, 0, 0),
-        1: (0, 0, 0),
-        2: (0, 0, 0),
-        3: (0, 0, 0),
-        4: (0, 0, 100),
-        
-        5: (0, 0, 100),
-        6: (0, 0, 100),
-       
-        7: (0, 0, 0),
-
-        8: (0, 0, 0),
-        9: (0, 0, 0),
-
-        10: (0, 0, 0),
-        11: (0, 0, 0),
-        12: (0, 0, 0),
-        13: (0, 0, 0),
-
-
-    }
-    edges = [
-        (0, 1, "grass", 1040),
-        (1, 2, "grass", 1040),
-        (2, 3, "water", 1000),
-        (3, 4, "cliff", 100),
-        (4, 7, "slope", 3600),
-        
-        (2, 5, "grass", 2000),
-        (5, 4, "grass", 3400),
-
-        
-        (3, 6, "grass", 1100),
-        (6, 4, "grass", 2600),
-
-        (0, 8, "water", 4800),
-        (8, 9, "water", 4800),
-        (9, 7, "water", 4800),
-
-        (0, 10, "cliff", 825),
-        (10, 11, "cliff", 825),
-        (11, 13, "cliff", 825),
-        (13, 7, "cliff", 825)
-
-    ]
-    G = nx.Graph()
-    for node, (x, y, height) in nodes.items():
-        G.add_node(node, x=x, y=y, height=height)
-    for u, v, terrain, distance in edges:
-        G.add_edge(u, v, terrain=terrain, distance=distance)
-    print("Built test1.")
-    return G
-
 
 
 
@@ -164,71 +105,66 @@ def test2():
     }
     edges = [
 
-        (0, 22, "water", 0),
-        (22, 23, "water", 0),
-        (23, 24, "cliff", 0),
-        (24, 26, "grass", 0),
-        (26, 7, "slope", 0),
+        (0, 22, "water"),
+        (22, 23, "water"),
+        (23, 24, "cliff"),
+        (24, 26, "grass"),
+        (26, 7, "slope"),
 
+        (0, 1, "grass"),
+        (1, 2, "cliff"),
+        (2, 3, "cliff"),
+        (3, 4, "grass"),
+        (4, 5, "cliff"),
+        (5, 16, "cliff"),
 
+        (8, 16, "grass"),
+        # (11, 19, "cliff"), # adding this looks nice, but doesnt change anything computation 120s
+        # (12, 19, "slope"), # adding this looks nice, but doesnt change anything computation 120s
 
-        (0, 1, "grass", 800),
-        (1, 2, "cliff", 500),
-        (2, 3, "cliff", 500),
-        (3, 4, "grass", 540),
-        (4, 5, "cliff", 500),
-        (5, 16, "cliff", 500),
+        (13, 18, "grass"),
+        (18, 15, "grass"),
 
-        (8, 16, "grass", 2400),
-        # (11, 19, "cliff", 2400), # adding this looks nice, but doesnt change anything computation 120s
-        # (12, 19, "slope", 2400), # adding this looks nice, but doesnt change anything computation 120s
+        (6, 19, "grass"),
+        (19, 7, "slope"),
 
-        (13, 18, "grass", 2400),
-        (18, 15, "grass", 2400),
+        (0, 20, "grass"),
+        (20, 6, "grass"),
 
-        (6, 19, "grass", 2400),
-        (19, 7, "slope", 2400),
+        # (16, 21, "grass"),
+        # (21, 7, "water"),
+        # (2, 8, "grass"),
 
-        (0, 20, "grass", 500),
-        (20, 6, "grass", 500),
+        (0, 6, "water"),
 
-        # (16, 21, "grass", 1200),
-        # (21, 7, "water", 1200),
-        # (2, 8, "grass", 500),
-
-
-        (0, 6, "water", 1200),
-
-        (6, 8, "cliff", 180),
-        (8, 16, "slope", 2300),
-        (16, 7, "grass", 1040),
+        (6, 8, "cliff"),
+        (8, 16, "slope"),
+        (16, 7, "grass"),
         
-        # (0, 10, "grass", 3600),
-        (0, 20, "grass", 3600),
-        (20, 10, "grass", 3600),
-        (10, 11, "grass", 3600),
-        (11, 12, "grass", 3600),
-        (12, 7, "grass", 1800),
+        # (0, 10, "grass"),
+        (0, 20, "grass"),
+        (20, 10, "grass"),
+        (10, 11, "grass"),
+        (11, 12, "grass"),
+        (12, 7, "grass"),
 
-        # (0, 13, "water", 4700),
-        (0, 22, "water", 4700),
-        (22, 13, "water", 4700),
-        (13, 14, "water", 4700),
-        (14, 15, "water", 4700),
-        (15, 7, "water", 3800),
+        # (0, 13, "water"),
+        (0, 22, "water"),
+        (22, 13, "water"),
+        (13, 14, "water"),
+        (14, 15, "water"),
+        (15, 7, "water"),
 
-        (13, 17, "cliff", 125),
-        (17, 15, "cliff", 125),
+        (13, 17, "cliff"),
+        (17, 15, "cliff"),
 
     ]
 
     G = nx.Graph()
     for node, (x, y, height) in nodes.items():
         G.add_node(node, x=x, y=y, height=height)
-    # for u, v, terrain, distance in edges:
-    #     G.add_edge(u, v, terrain=terrain, distance=distance)
 
-    for (u, v, terrain, _) in edges:
+    for (u, v, terrain) in edges:
         G.add_edge(u, v, terrain=terrain)
     for (u, v) in G.edges():
         x_u, y_u, z_u = G.nodes[u]['x'], G.nodes[u]['y'], G.nodes[u]['height']
@@ -250,8 +186,6 @@ from dijkstra_visualize import visualize_world_with_multiline_3D
 
 
 
-
-
 import itertools
 import matplotlib.pyplot as plt
 from itertools import cycle
@@ -265,11 +199,6 @@ def group_meta_paths_by_modes(meta_paths, mode_list=["roll", "swim", "drive", "f
             groups[used].append(p)
     return {k: v for k, v in groups.items() if v}
 
-# grouped = group_meta_paths_by_modes(meta_paths)
-# for k, v in grouped.items():
-#     print(k, len(v))
-
-
 def group_meta_paths_by_mode_number(meta_paths):
     groups = {}
     for p in meta_paths:
@@ -278,10 +207,6 @@ def group_meta_paths_by_mode_number(meta_paths):
         if count:
             groups.setdefault(count, []).append(p)
     return groups
-
-grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
-for k, v in grouped_by_number.items():
-    print(k, len(v))
 
 def compute_pareto_front(meta_paths):
     pareto = []
@@ -303,27 +228,28 @@ def compute_pareto_front(meta_paths):
 grouped = group_meta_paths_by_modes(meta_paths)
 grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 
-for path in grouped_by_number[4]:
-    print(path.path_obj)
-    print("-----")
 
-# pf = compute_pareto_front(grouped_by_number[2])
+# for k, v in grouped.items():
+#     print(k, len(v))
+
+# for k, v in grouped_by_number.items():
+#     print(k, len(v))
+
+# for path in grouped_by_number[4]:
+#     print(path.path_obj)
+#     print("-----")
+
+# pf = compute_pareto_front(grouped_by_number[4])
 # for path in pf:
-#     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="traveled_only")
-
-pf = compute_pareto_front(grouped_by_number[4])
-for path in pf:
-    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
-
+#     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
 
 
 markers = cycle(['o', 's', '^', 'D', 'v', 'P', '*', 'X', 'h', '+'])
 colors = cycle(plt.cm.tab10.colors)
 
-# fig, axs = plt.subplots(2, 1, figsize=(5, 7))
 
-fig, ax = plt.subplots(figsize=(8, 7))
-axs = [None, ax]
+
+fig, axs = plt.subplots(2, 1, figsize=(5, 7))
 
 # Scatter plots for each mode combination (grouped by exact modes used)
 for combo, paths in grouped.items():
@@ -333,10 +259,9 @@ for combo, paths in grouped.items():
     times = [p.total_time for p in paths]
     distances = [sum(p.mode_distances.values()) for p in paths]
     energies = [p.total_energy for p in paths]
-    # axs[0].scatter(times, distances, marker=marker, color=color, label=label)
+    axs[0].scatter(times, distances, marker=marker, color=color, label=label)
     axs[1].scatter(times, energies, marker=marker, color=color, label=label)
 
-# Overlay dashed lines for Pareto fronts computed per mode count
 for count, paths in grouped_by_number.items():
     pf = compute_pareto_front(paths)
     if not pf:
@@ -347,34 +272,22 @@ for count, paths in grouped_by_number.items():
     label = f"{count} mode{'s' if count > 1 else ''} Pareto Front"
     axs[1].plot(times_pf, energies_pf, linestyle="--", marker=None, color="black", label=None)
 
+for ax in axs:
+    ax.grid(True, linestyle="--", alpha=0.5)
 
-
-
-
-
-# for ax in axs:
-#     ax.set_xlim(0, 5000)
-#     ax.grid(True, linestyle="--", alpha=0.5)
-
-# axs[0].set_xlabel("Travel Time (s)")
-# axs[0].set_ylabel("Travel Distance (m)")
-# axs[0].set_title("Travel Time vs. Distance")
+axs[0].set_xlabel("Travel Time (s)")
+axs[0].set_ylabel("Travel Distance (m)")
+axs[0].set_title("Travel Time vs. Distance")
 axs[1].set_xlabel("Travel Time (s)")
 axs[1].set_ylabel("Total Energy (Wh)")
 axs[1].set_title("Travel Time vs. Energy")
-# axs[0].legend(title="Mode Combination", fontsize=8)
+axs[0].legend(title="Mode Combination", fontsize=8)
 axs[1].legend(title="Mode Combo / Pareto Front", fontsize=8)
 for ax in axs:
     if ax is not None:
         ax.grid(True, linestyle="--", alpha=0.5)
 plt.tight_layout()
 plt.show()
-
-
-
-# for path in grouped[frozenset({'fly', 'drive'})]:
-#     print(path.path_obj)
-#     
 
 
 
