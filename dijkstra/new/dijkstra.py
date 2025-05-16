@@ -118,8 +118,8 @@ def test2():
         (5, 16, "cliff"),
 
         (8, 16, "grass"),
-        (11, 19, "cliff"), # adding this looks nice, but doesnt change anything computation 120s
-        (12, 19, "slope"), # adding this looks nice, but doesnt change anything computation 120s
+        # (11, 19, "cliff"), # adding this looks nice, but doesnt change anything computation 120s
+        # (12, 19, "slope"), # adding this looks nice, but doesnt change anything computation 120s
 
         (13, 18, "grass"),
         (18, 15, "grass"),
@@ -147,7 +147,7 @@ def test2():
         (11, 12, "grass"),
         (12, 7, "grass"),
 
-        # (0, 13, "water"),
+        (0, 13, "water"),
         (0, 22, "water"),
         (22, 13, "water"),
         (13, 14, "water"),
@@ -158,6 +158,9 @@ def test2():
         (17, 15, "cliff"),
 
     ]
+
+    # ignore simple paths that have more than X nodes
+    
 
     G = nx.Graph()
     for node, (x, y, height) in nodes.items():
@@ -238,9 +241,9 @@ grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 #     print(path.path_obj)
 #     print("-----")
 
-# pf = compute_pareto_front(grouped_by_number[4])
-# for path in pf:
-#     visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
+pf = compute_pareto_front(grouped_by_number[4])
+for path in pf:
+    visualize_world_with_multiline_3D(G_world, L, path.path_obj, CONSTANTS, label_option="all_edges")
 
 
 # Define markers and colors
