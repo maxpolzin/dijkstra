@@ -1,12 +1,8 @@
 # %%   
 
-import os
-import copy
 import math
-import random
-import pickle
 import networkx as nx
-from joblib import Memory, Parallel, delayed
+from joblib import Memory
 import matplotlib.pyplot as plt
 
 def setup_autoreload():
@@ -25,7 +21,6 @@ memory = Memory("cache_dir", verbose=0)
 # %%
 
 from dijkstra_algorithm import find_all_feasible_paths, analyze_paths, build_layered_graph
-from dijkstra_scenario import PremadeScenarios
 
 clear_cache = False
 if clear_cache:
@@ -59,7 +54,7 @@ def compute_for_scenario(graph, constants):
     return G_world, L, meta_paths
 
 
-def test2():
+def scenario_with_pareto_front():
     nodes = {
         1: (0, 800, 0),
         2: (0, 1150, 357),
@@ -158,9 +153,7 @@ def test2():
         (17, 15, "cliff"),
 
     ]
-
-    # ignore simple paths that have more than X nodes
-    
+  
 
     G = nx.Graph()
     for node, (x, y, height) in nodes.items():
@@ -179,8 +172,7 @@ def test2():
     return G
 
 
-# scenario = PremadeScenarios.test1()
-scenario = test2()
+scenario = scenario_with_pareto_front()
 
 G_world, L, meta_paths = compute_for_scenario(scenario, constants=CONSTANTS)
 
@@ -230,16 +222,6 @@ def compute_pareto_front(meta_paths):
 grouped = group_meta_paths_by_modes(meta_paths)
 grouped_by_number = group_meta_paths_by_mode_number(meta_paths)
 
-
-# for k, v in grouped.items():
-#     print(k, len(v))
-
-# for k, v in grouped_by_number.items():
-#     print(k, len(v))
-
-# for path in grouped_by_number[4]:
-#     print(path.path_obj)
-#     print("-----")
 
 pf = compute_pareto_front(grouped_by_number[4])
 for path in pf:
@@ -293,80 +275,6 @@ ax2.legend(title="Mode Combo / Pareto Front", fontsize=8)
 plt.tight_layout()
 
 plt.show()
-
-
-
-
-# %%
-
-# import itertools
-
-# import matplotlib.pyplot as plt
-
-
-
-# selected_keys = list(all_scenarios.keys())[:]
-
-# for selected_scenario in selected_keys:
-#     selected_variation = 0
-#     if selected_scenario in all_results[selected_variation]["results"]:
-#         constants = all_results[selected_variation]["constants"]
-#         data = all_results[selected_variation]["results"][selected_scenario]
-#         G_world = data["G_world"]
-#         L = data["L"]
-#         optimal_path = data["optimal_path"]
-#         meta_paths = data["meta_paths"]
-#         pareto_front = data["pareto_front"]
-        
-#         print("Optimal Path:")
-#         print(optimal_path)
-#         print("-----")
-
-#         # print first 10 paths
-#         selected_paths = sorted(meta_paths, key=lambda m: m.total_time)[:10]
-
-#         for meta_path in selected_paths:
-#             print(meta_path.path_obj)
-#             print("-----")
-
-#         # visualize_world_with_multiline_3D(G_world, L, optimal_path, constants, label_option="all_edges")
-#         # plot_basic_metrics(meta_paths, pareto_front, optimal_path)
-#         # plot_stacked_bars(meta_paths)
-
-#         # visualize_param_variations(all_results, selected_scenario)
-
-#         # visualize_pareto_fronts(all_results, selected_scenario)
-
-#         plot_pareto_front_distance_vs_time(pareto_front, L, constants)
-#         # plot_path_distance_vs_time(meta_paths, L, constants, n_paths=100)
-        
-#         plot_pareto_fronts_all_combinations(meta_paths, mode_list=["fly", "swim", "roll", "drive"])
-#         plt.show()
-
-#     else:
-#         print(f"Scenario {selected_scenario} not found in variation {selected_variation}.")
-
-
-
-
-# ('roll',)
-# ('swim',)
-# ('drive',)
-# ('fly',) 
-# ('roll', 'swim')
-# ('roll', 'drive')
-# ('roll', 'fly')
-# ('swim', 'drive')
-# ('swim', 'fly')
-# ('drive', 'fly')
-# ('roll', 'swim', 'drive')
-# ('roll', 'swim', 'fly')
-# ('roll', 'drive', 'fly')
-# ('swim', 'drive', 'fly')
-# ('roll', 'swim', 'drive', 'fly')
-
-
-
 
 
 # %%
